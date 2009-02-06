@@ -2,8 +2,8 @@
 
 #*********************************************
 # Name:     lrcdis （外挂式显歌词脚本）
-# Version:  090119
-# License:  GPLv3
+# Version:  090206
+# License:  GPL
 # Author:   xiooli solcomo bones7456
 #*********************************************
 
@@ -104,7 +104,7 @@ CHECK_PLAYER() {    #自动检查播放器类型的函数
     local players i
 
     #所有被支持的播放器都保存下面的字符串里面
-    players="rhythmbox audacious amarokapp exaile quodli mocp mpd mplayer"
+    players="rhythmbox audacious amarok amarokapp exaile quodli mocp mpd mplayer"
 
     for i in $players;do
         if [ "`ps aux | grep "$i" | grep -v "grep"`" ];then
@@ -123,8 +123,8 @@ DOWNLRC(){      #下载歌词的函数
     local nm lang link full_link
 
 	nm="$1"
-    Save_dir="${2:-$Lrcdir}"
-    Save_dir="${Save_dir/%\//}"
+	Save_dir="${2:-$Lrcdir}"
+	Save_dir="${Save_dir/%\//}"
 
 	#判断当前locale，utf-8的locale将要使用编码转换
 	[ `locale |grep "LANG=.*UTF-8"` ] && lang=1
@@ -190,7 +190,17 @@ GET_TITLE() {       #获取当前播放的歌曲名字
         fi
     ;;
     "amarok")
-            dcop amarok player nowPlaying|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'
+	    if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
+		t="`qdbus org.kde.amarok /Player GetMetadata|grep "^title:"|sed "s/title: *//"`"
+		a="`qdbus org.kde.amarok /Player GetMetadata|grep "^artist:"|sed "s/artist: *//"`"
+		if [ "$t" -a "$a" ];then
+		    echo "$a" - "$t"
+		else
+		    echo "$t"
+		fi
+	    else
+		dcop amarok player nowPlaying|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'
+	    fi
     ;;
     "exaile")
         t=`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title| \
@@ -252,7 +262,12 @@ GET_PLTM() {
         [ "$tm" ] && echo $(($tm/1000))
     ;;
     "amarok")
-        tm="`dcop amarok player trackCurrentTime`"
+	if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
+	    tm="`qdbus org.kde.amarok /Player PositionGet`"
+	    tm=$(($tm/1000))
+	else
+	    tm="`dcop amarok player trackCurrentTime`"
+	fi
         [ "$tm" ] && echo "$tm"
     ;;
     "exaile")
@@ -290,7 +305,7 @@ DIS_WORDS() {        #以cli或osd模式显示文字
 
     line="$*"
 
-	if [ "$Dismode" = "osd" -a "`which gnome-osd-client`" ];then
+	if [ "$Dismode" = "osd" -a "`which gnome-osd-client 2>/dev/null`" ];then
         gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>`echo -e "$line"`</span></message>"
 	else
         if [ "`echo "$line"|sed "s/\*\{6\}$Title\*\{6\}//"`" ];then
@@ -462,4 +477,3 @@ case "$1" in
         MAIN
     ;;
 esac
-

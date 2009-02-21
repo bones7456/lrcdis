@@ -1,7 +1,7 @@
 #!/bin/bash
 # Name:     lrcdis （外挂式显歌词脚本）
-# Version:  090218
-# License:  GPL
+# Version:  090221
+# License:  GPLv3
 # Author:   xiooli,solcomo,bones7456
 
 
@@ -17,7 +17,7 @@ INIT() {    #程序初始化函数
 #===================LRCDIS-CONFIG================
 #保存lrc文件的文件夹
 Lrcdir=~/.lyrics
-#显示模式： cli, osd
+#显示模式： cli, osd, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
 #播放器类型： mpd, mocp, audacious, amarok, exaile, quodlibet, rhythmbox
 Player=rhythmbox
@@ -88,6 +88,8 @@ USAGE() {   #显示帮助信息的函数
             不写路径则保存至默认目录 ${Lrcdir:-~/.lyrics}
         -o, --osd
             自动检查播放器并以osd模式显示歌词
+		-f, --fifo
+			自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
         -c, --cli
             自动检查播放器并以cli模式显示歌词
     备注：
@@ -105,15 +107,19 @@ CHECK_PLAYER() {    #自动检查播放器类型的函数
 
     #所有被支持的播放器都保存下面的字符串里面
     players="rhythmbox audacious amarok amarokapp exaile quodli mocp mpd mplayer"
-
-    for i in $players;do
-        if [ "`ps aux | grep "$i" | grep -v "grep"`" ];then
-            echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
-            break
-        else
-            echo -n ""
-        fi
-    done
+	
+	if [ ! "`ps aux | grep "$Player" | grep -v "grep"`" ];then
+		for i in $players;do
+			if [ "`ps aux | grep "$i" | grep -v "grep"`" ];then
+				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
+				break
+			else
+				echo -n ""
+			fi
+		done
+	else
+		echo -n "$Player"
+	fi
 }
 
 DOWNLRC(){      #下载歌词的函数
@@ -317,6 +323,8 @@ DIS_WORDS() {        #以cli或osd模式显示文字
 		fi			
 		
         gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>`echo -e "$line"`</span></message>"
+	elif [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
+		echo -ne "$line">/dev/shm/lrcfifo
 	else
         if [ "`echo "$line"|sed "s/\*\{6\}$Title\*\{6\}//"`" ];then
             N="${N:-1}"
@@ -399,7 +407,6 @@ MAIN() {
 
     local lrc pltm line0 line1 title
 
-    [ "`pgrep $Player`" ] || exit
     Title="`GET_TITLE $Player $Readname`"
     pltm="`GET_PLTM $Player`"
 
@@ -431,59 +438,43 @@ MAIN() {
 
 #===========================主流程==============================
 
+INIT
 case "$1" in
-    "-h"|"--help")
-        USAGE
-    ;;
-    "-d"|"--download")
-        INIT
-        if [ "$2" ];then
-            DOWNLRC "$2" "$3"
-            if [ -f "$Save_dir/$2.lrc" ];then
-                echo "歌词文件 $Save_dir/$2.lrc 已保存。"
-            else
-                echo "歌词文件下载失败：（"
-            fi
-        else
-            echo "未输入歌曲名！"
-        fi
-    ;;
-    "-o"|"--osd")
-        INIT
-        Dismode=osd
-        sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
-        Player="`CHECK_PLAYER`"
-        if [ "$Player" ];then
-            sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"
-        else
-            DIS_WORDS "未发现被支持的播放器进程！\n"
-            exit
-        fi
-        MAIN
-    ;;
-    "-c"|"--cli")
-        INIT
-        Dismode=cli
-        sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
-        Player="`CHECK_PLAYER`"
-        if [ "$Player" ];then
-            sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"
-        else
-            DIS_WORDS "未发现被支持的播放器进程！\n"
-            exit
-        fi
-        MAIN
-    ;;
-    *)
-        INIT
-        player="`CHECK_PLAYER`"
-        [ "$Player" != "$player" ] && DIS_WORDS "默认播放器未开启，自动检测播放器。\n" && \
-        if [ "$player" ];then
-            Player="$player"
-            sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"
-        else
-            DIS_WORDS "未发现被支持的播放器进程！\n"
-        fi
-        MAIN
-    ;;
+"-h"|"--help")
+	USAGE
+	exit
+;;
+"-d"|"--download")
+	if [ "$2" ];then
+		DOWNLRC "$2" "$3"
+		if [ -f "$Save_dir/$2.lrc" ];then
+			echo "歌词文件 $Save_dir/$2.lrc 已保存。"
+		else
+			echo "歌词文件下载失败：（"
+		fi
+	else
+		echo "未输入歌曲名！"
+	fi
+	exit
+;;
+"-o"|"--osd")
+	Dismode=osd
+;;
+"-f"|"--fifo")
+	Dismode=fifo
+	[ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo
+;;
+"-c"|"--cli")
+	Dismode=cli
+;;
 esac
+
+sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
+Player="`CHECK_PLAYER`"
+if [ "$Player" ];then
+	sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"
+else
+	DIS_WORDS "未发现被支持的播放器进程！\n"
+	exit
+fi
+MAIN

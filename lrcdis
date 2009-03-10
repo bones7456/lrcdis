@@ -1,6 +1,6 @@
 #!/bin/bash
 # Name:     lrcdis （外挂式显歌词脚本）
-# Version:  090222
+# Version:  090310
 # License:  GPLv3
 # Author:   xiooli,solcomo,bones7456
 
@@ -17,8 +17,8 @@ INIT() {    #程序初始化函数
 #===================LRCDIS-CONFIG================
 #保存lrc文件的文件夹
 Lrcdir=~/.lyrics
-#显示模式： cli, osd, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
-Dismode=osd
+#显示模式： cli, osd, notify, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
+Dismode=notify
 #播放器类型： mpd, mocp, audacious, amarok, exaile, quodlibet, rhythmbox
 Player=rhythmbox
 #获取歌曲名称方式： id3 id3标签方式， filename 文件名方式
@@ -33,7 +33,7 @@ Row=10
 Titlecolor=\$green
 #歌曲歌词的颜色（见最后的颜色定义）
 Lyricscolor=\$smoothblue
-#======================[osd]=====================
+#=================[osd && notify]================
 #osd显示时的参数
 #osd显示位置：top, bottom
 Vposition=top
@@ -50,6 +50,8 @@ Foreground=green
 Animations=off
 #是否加新行，以免挡住panel等: off, on
 Addnewline=off
+#notify模式的图表文件名(只支持绝对路径)
+NotifyIcon=""
 #================================================
 #定义颜色（仅在cli模式下使用）
 black="38;5;0m"
@@ -88,6 +90,8 @@ USAGE() {   #显示帮助信息的函数
             不写路径则保存至默认目录 ${Lrcdir:-~/.lyrics}
         -o, --osd
             自动检查播放器并以osd模式显示歌词
+        -n, --notify
+            自动检查播放器并以notify模式显示歌词
 		-f, --fifo
 			自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
         -c, --cli
@@ -303,7 +307,7 @@ GET_PLTM() {
 
 }
 
-DIS_WORDS() {        #以cli或osd模式显示文字
+DIS_WORDS() {        #以各种预设的模式显示文字
 
     #参数不定，$*； 正确执行或从 osd 或从终端将 $* 格式化输出
 
@@ -326,6 +330,12 @@ DIS_WORDS() {        #以cli或osd模式显示文字
 	elif [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
 		cat < /dev/shm/lrcfifo &
 		echo -ne "$line" > /dev/shm/lrcfifo
+	elif [ "$Dismode" = "notify" -a "`which notify-send 2>/dev/null`" ];then
+		if [ -n $NotifyIcon ];then
+			notify-send -c lrcdis -i "$NotifyIcon" -t $Timeout "$line"
+		else
+			notify-send -c lrcdis -t $Timeout "$line"
+		fi
 	else
         if [ "`echo "$line"|sed "s/\*\{6\}$Title\*\{6\}//"`" ];then
             N="${N:-1}"
@@ -460,6 +470,9 @@ case "$1" in
 ;;
 "-o"|"--osd")
 	Dismode=osd
+;;
+"-n"|"--notify")
+	Dismode=notify
 ;;
 "-f"|"--fifo")
 	Dismode=fifo

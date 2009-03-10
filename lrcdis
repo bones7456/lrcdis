@@ -1,9 +1,8 @@
 #!/bin/bash
 # Name:     lrcdis （外挂式显歌词脚本）
-# Version:  090310
 # License:  GPLv3
 # Author:   xiooli,solcomo,bones7456
-
+Version=090310
 
 Conf_file=~/.config/lrcdis.conf
 
@@ -18,7 +17,7 @@ INIT() {    #程序初始化函数
 #保存lrc文件的文件夹
 Lrcdir=~/.lyrics
 #显示模式： cli, osd, notify, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
-Dismode=notify
+Dismode=osd
 #播放器类型： mpd, mocp, audacious, amarok, exaile, quodlibet, rhythmbox
 Player=rhythmbox
 #获取歌曲名称方式： id3 id3标签方式， filename 文件名方式
@@ -92,10 +91,12 @@ USAGE() {   #显示帮助信息的函数
             自动检查播放器并以osd模式显示歌词
         -n, --notify
             自动检查播放器并以notify模式显示歌词
-		-f, --fifo
-			自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
+        -f, --fifo
+            自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
         -c, --cli
             自动检查播放器并以cli模式显示歌词
+        -v, --version
+            显示版本号并退出
     备注：
         不加任何参数则以 $Conf_file 
         为配置文件初始化运行
@@ -480,6 +481,10 @@ case "$1" in
 ;;
 "-c"|"--cli")
 	Dismode=cli
+;;
+"-v"|"--version")
+	echo $0" Version:"$Version
+	exit
 ;;
 esac
 

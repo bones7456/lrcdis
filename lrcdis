@@ -124,13 +124,13 @@ CHECK_PLAYER() {    #自动检查播放器类型的函数
     local players i
 
     #所有被支持的播放器都保存下面的字符串里面
-    players="rhythmbox audacious amarok amarokapp exaile quodli mocp mpd mplayer"
-	if pgrep "$Player" >/dev/null;then
+    players="rhythmbox audacious amarok amarokapp exaile quodli quodlibet mocp mpd mplayer"
+	if pgrep -f "$Player" >/dev/null;then
 		echo -n "$Player"
 	else
 		for i in $players;do
 			[ "$debug" = 1 ] && echo "$Player   $i" >&2
-			if pgrep "$i" >/dev/null ;then
+			if pgrep -f "$i" >/dev/null ;then
 				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
 				break
 			else
@@ -166,7 +166,7 @@ GET_TITLE() {       #获取当前播放的歌曲名字
 
     #参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
 
-    local readname t a tmp flag ans
+    local readname t a tmp flag ans sn
 
     readname=${2:-id3}
 
@@ -239,10 +239,9 @@ GET_TITLE() {       #获取当前播放的歌曲名字
         fi
     ;;
     "quodlibet")
-        t="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong| \
-        sed -n '/title/{n;p}'|sed q | awk -F[\"\"] '{print $2}'`"
-        a="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong| \
-        sed -n '/artist/{n;p}'|sed '1p'|awk -F[\"\"] '{print $2}'`"
+		sn="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong`"
+		a="`echo "$sn" | grep -FA1 '   string "artist' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		t="`echo "$sn" | grep -FA1 '   string "title' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
         echo "$a" - "$t"
     ;;
     "rhythmbox")
@@ -422,7 +421,7 @@ GET_STAT() {    #获取播放器的当前状态
         ((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
         ((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
         sleep $Sleeptm
-        [ "$n0" = "1" ] && [ ! "`pgrep $Player`" ] && echo -e "lrcdisERROR未发现被支持的播放器进程！" && exit
+        [ "$n0" = "1" ] && [ ! "`pgrep -f $Player`" ] && echo -e "lrcdisERROR未发现被支持的播放器进程！" && exit
         [ "$n0" = "1" ] && { 
 			pltm0="`GET_PLTM $Player`"
 			if [ "${pltm0:-0}" = "$pltm1" ]|| [ "$pltm0" = "" ];then

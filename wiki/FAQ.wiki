@@ -14,7 +14,14 @@
 当然有，如果你的歌曲文件都是 歌名-歌手.mp3 这样的形式的话，就很方便了，cd到歌曲所在目录，执行：
 
 {{{
-for i in `ls`; do lrcdis -d ${i%.mp3}; done
+for i in *.mp3; do lrcdis -d ${i%.mp3}; done
+}}}
+
+如果名字不规范，但是歌曲的ID3信息规范的话还可以这样： 
+
+{{{
+for i in *mp3;do ar="`mid3v2 -l "$i" |grep TPE1 |sed 's/^.*=//'`"; ti="`mid3v2 -l "$i" |grep TIT2 |sed 's/^.*=//'`";lrcdis -d "$ti-$ar";done
+注：上述命令要求 python-mutagen 包提供的 mid3v2 命令。
 }}}
 
 既可下载整个目录的歌词文件了。

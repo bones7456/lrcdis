@@ -76,6 +76,17 @@ EOF
     . "$Conf_file"
 }
 
+DO_NAME() {
+	#  1 argument, the filename
+	#  removing .mp3/.wma/.ogg etc.
+	local a
+	a="`basename "$1"`"
+	a="${a/%.mp3/}"; a="${a/%.MP3/}"
+	a="${a/%.wma/}"; a="${a/%.WMA/}"
+	a="${a/%.ogg/}"; a="${a/%.OGG/}"
+	echo "$a"
+}
+
 USAGE() {   #显示帮助信息的函数
 
     #没有参数，执行显示帮助信息
@@ -171,6 +182,7 @@ GET_TITLE() {       #获取当前播放的歌曲名字
           sn="${sn/$flag/}"
           ans="${sn}"
     fi  
+	ans="`DO_NAME "$ans"`"
 	echo "$ans"
 	[ "$debug" = 1 ]&& echo "GET_TITLE: $ans" >&2
 	;;
@@ -189,16 +201,15 @@ GET_TITLE() {       #获取当前播放的歌曲名字
     ;;
     "audacious")
         if [ "$readname" = "filename" ];then
-            audtool current-song-filename|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'| \
-            perl -p -e 's/%(..)/pack("c", hex($1))/eg'
+            f="`audtool current-song-filename`"
+			echo "`DO_NAME "$f"`"
         else
-            t="`audtool current-song|awk -F'-' '{printf $3}'`"
-            a="`audtool current-song|awk -F'-' '{printf $1}'`"
-            if [ "$t" -a "$a" ];then
-                echo "$a" - "$t"
+            t="`audtool current-song`"
+            if [ "$t" ];then
+                echo "$t"
             else
-                audtool current-song-filename|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'| \
-                perl -p -e 's/%(..)/pack("c", hex($1))/eg'
+				f="`audtool current-song-filename`"
+				echo "`DO_NAME "$f"`"
             fi
         fi
     ;;
@@ -274,8 +285,8 @@ GET_PLTM() {
         [ "$tm" ] && echo $(($min*60+$sec))
     ;;
     "audacious")
-        tm="`audtool current-song-output-length-frames`"
-        [ "$tm" ] && echo $(($tm/1000))
+        tm="`audtool current-song-output-length-seconds`"
+        [ "$tm" ] && echo "$tm"
     ;;
     "amarok")
 	if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then

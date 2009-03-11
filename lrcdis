@@ -363,7 +363,7 @@ DIS_WORDS() {        #以各种预设的模式显示文字
                 ((N=1))
             fi
         else
-        	if [ "$1" = W ] ;then
+        	if [ "$1" = T ] ;then
 				line="****** $line ******"
 			else
 				line="错误: $line"
@@ -523,7 +523,7 @@ if [ "$Player" ];then
 	sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"
 else
 	DIS_WORDS E "未发现被支持的播放器进程！"
-	echo
+	[ "$Dismode" = cli ] && echo
 	exit
 fi
 MAIN

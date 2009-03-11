@@ -118,7 +118,7 @@ CHECK_PLAYER() {    #自动检查播放器类型的函数
 		echo -n "$Player"
 	else
 		for i in $players;do
-			echo "$Player   $i" >&2
+			[ "$debug" = 1 ] && echo "$Player   $i" >&2
 			if pgrep "$i" >/dev/null ;then
 				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
 				break

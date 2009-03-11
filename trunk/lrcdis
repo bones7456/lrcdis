@@ -3,7 +3,7 @@
 # License:  GPLv3
 # Credit:   xiooli,solcomo,bones7456,oldherl  (2008-2009)
 # Encoding: UTF-8
-Version=090310
+Version=svn-090311
 #是否开启调试信息
 debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -51,7 +51,7 @@ Foreground=green
 Animations=off
 #是否加新行，以免挡住panel等: off, on
 Addnewline=off
-#notify模式的图表文件名(只支持绝对路径)
+#notify模式的图标文件名(只支持绝对路径)
 NotifyIcon=""
 #================================================
 #定义颜色（仅在cli模式下使用）
@@ -216,15 +216,14 @@ GET_TITLE() {       #获取当前播放的歌曲名字
 	    fi
     ;;
     "exaile")
-        t=`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title| \
-        sed -n '$p'|awk -F[\"\"] '{print $2}'`
-
+        t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title \
+			| sed -n '$p'|awk -F'"' '{print $2}'`"
         tmp="`echo "$t"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'`"
         if [ "$tmp" != "$t" ] ; then
             echo "$tmp"
         else
-            a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_artist| \
-            sed -n '$p'|awk -F[\"\"] '{print $2}'`"
+            a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_artist \
+            | sed -n '$p'|awk -F'"' '{print $2}'`"
             echo "$a" - "$t"
         fi
     ;;
@@ -252,7 +251,8 @@ GET_TITLE() {       #获取当前播放的歌曲名字
 GET_PLTM() {
     
    #参数一个，$1，播放器类型；返回播放器播放歌曲的当前时间 (转换成秒)
-    
+   #GET_PLTM如果是空那么就表示已经停止或者播放器退出。
+   
     local tm min sec tmptm
 
     case "${1:-rhythmbox}" in
@@ -287,8 +287,8 @@ GET_PLTM() {
         [ "$tm" ] && echo "$tm"
     ;;
     "exaile")
-        tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query| \
-        sed -n '$p'|awk -F['\[\]'] '{print $2}'`"
+        tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query \
+        | sed -n '$p'|awk -F[][] '{print $2}'`"
         min=${tm//:*/}
         tmptm=${tm//*:/}
         sec=${tmptm/#0/}

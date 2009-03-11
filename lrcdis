@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 Version=svn-090311
 #是否开启调试信息
-debug=0
+debug=1
 Conf_file=~/.config/lrcdis.conf
 
 #=========================定义函数=============================
@@ -140,11 +140,25 @@ CHECK_PLAYER() {    #自动检查播放器类型的函数
 	fi
 }
 
+BAIDU_URI(){
+	# 1 argument: gb
+	local htm
+	htm="`wget "http://mp3.baidu.com/m?f=ms&tn=baidump3lyric&ct=150994944&lf=2&rn=10&word="$1"&lm=-1" -q -T 10 -O- 2>/dev/null`"
+	echo "$htm" | grep -F .lrc | cut -d' ' -f3 | cut '-d"' -f2 | head -n 1
+}
+SOGOU_URI(){
+	# 1 argument: gb
+	local htm
+	echo -n 'http://mp3.sogou.com/'
+	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null`"
+	echo "$htm" | grep -im1 "downlrc"|awk -F"\"" '{print $2}'
+}
+
 DOWNLRC(){      #下载歌词的函数
 
     #参数一个，$1 (str)： 歌曲名字; 没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
 
-    local nm link full_link
+    local nm link full_link gb
 
 	nm="$1"
 	Save_dir="${2:-$Lrcdir}"
@@ -153,9 +167,10 @@ DOWNLRC(){      #下载歌词的函数
 	#将歌曲名字转换为urlencode，utf-8的locale必须先转换为gbk的编码
   	gb="$(echo -n "$nm" | iconv -c -t gbk | od -t x1 -A n -w1000|tr " " "%")"
 
-	#从sogou搜索里面找出当前歌曲的歌词下载页
-  	link="http://mp3.sogou.com/$(wget "http://mp3.sogou.com/gecisearch.so?query="$gb"" -q -T 10 \
-    -O-|grep -im1 "downlrc"|awk -F"\"" '{print $2}')"
+	#从baidu搜索里面找出当前歌曲的歌词下载页
+	#FIXME: just for a try
+  	link="`BAIDU_URI "$gb"`"
+	[ "$debug" = 1 ] && echo "Link: $link" >&2
   	while [ "$link" ] && [ ! -s "$Save_dir/$nm.lrc" ];do
 		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c -o "$Save_dir/$nm.lrc"
 		[ -s "$Lrcdir/$nm.lrc" ] && sed -i "s/\r//g" "$Save_dir/$nm.lrc" #去掉dos字符
@@ -175,12 +190,10 @@ GET_TITLE() {       #获取当前播放的歌曲名字
     flag="LRCDISXXX"
     if [ "$readname" = "filename" ] ; then
           sn="`mpc --format "$flag%file%" | grep "$flag" `"
-          sn="${sn/$flag/}"
-          ans="${sn/.mp3/}"
+          ans="${sn/$flag/}"
     else  
           sn="`mpc --format "[$flag[%artist% - ]%title%]|$flag[%file%]" | grep "$flag" `"
-          sn="${sn/$flag/}"
-          ans="${sn}"
+          ans="${sn/$flag/}"
     fi  
 	ans="`DO_NAME "$ans"`"
 	echo "$ans"

@@ -315,35 +315,40 @@ GET_PLTM() {
 
 DIS_WORDS() {        #以各种预设的模式显示文字
 
-    #参数不定，$*； 正确执行或从 osd 或从终端将 $* 格式化输出
+    #两个参数; $1:T标题W普通歌词E错误信息  正确执行按照Dismode将 $2 格式化输出
 
-    local line i
+    local line i NL
 
-    line="$*"
-    NL="
- "
+    line="$2"
+    NL="\n"
+	#[ "$2" = "" ] && exit
 
 	if [ "$Dismode" = "osd" -a "`which gnome-osd-client 2>/dev/null`" ];then
-		if [ "$Addnewline" == "on" ];then
-			if [ "$Vposition" == "top" ];then
-				line=$NL$line
+		[ "$1" = T ] && line="****** $line ******"
+		[ "$1" = E ] && line="****** $line ******"
+		if [ "$Addnewline" = "on" ];then
+			if [ "$Vposition" = "top" ];then
+				line="$NL$line"
 			else
-				line=$line$NL
+				line="$line$NL"
 			fi
-		fi			
-		
+		fi	
         gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>`echo -e "$line"`</span></message>"
 	elif [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
+		[ "$1" = T ] && line="****** $line ******"
+		[ "$1" = E ] && line="****** $line ******"
 		cat < /dev/shm/lrcfifo &
 		echo -ne "$line" > /dev/shm/lrcfifo
 	elif [ "$Dismode" = "notify" -a "`which notify-send 2>/dev/null`" ];then
+		[ "$1" = T ] && line="****** $line ******"
+		[ "$1" = E ] && line="****** $line ******"
 		if [ -n "$NotifyIcon" ];then
 			notify-send -c lrcdis -i "$NotifyIcon" -t "$Timeout" "$line"
 		else
 			notify-send -c lrcdis -t "$Timeout" "$line"
 		fi
 	else
-        if [ "`echo "$line"|sed "s/\*\{6\}$Title\*\{6\}//"`" ];then
+        if [ "$1" = W ] ;then
             N="${N:-1}"
             [ "$N" = "1" ] && \
             for i in `seq $Row`;do
@@ -358,6 +363,7 @@ DIS_WORDS() {        #以各种预设的模式显示文字
                 ((N=1))
             fi
         else
+			line="****** $line ******"
             for i in `seq 0 $Row`;do
                 tput cup "$i" 0
                 echo -n "                                                                                                 "
@@ -376,13 +382,13 @@ DISPLAY() {         #显示歌词函数
     local line tmp
 
 	if [ "$1" ] && [ "$2" ];then
-		[ "$debug" = 1 ]&& echo "DISPLAY: x$1x" >&2
+		#[ "$debug" = 1 ]&& echo "DISPLAY: x$1x" >&2
         #下面这一长句之所以这么繁复是为了让歌词文件里面本来是几行，但是因为某种原因合并到一行的烂文件还能正确显示
         #例如：[02:19.46][00:59.86]XXXXXX[03:26.38][02:27.68][01:08.23]YYYYYY
         #亦即即使你把歌曲文件连成只有一行也能正确显示而不会掉词。
         [ "$Tm" != "$1" ] && Tm="$1" && { #只显示与上次时间不一样的
 		tmp="`echo -e "$2"|grep "$1."`" && [ "$tmp" ] && { #找到该行
-        DIS_WORDS "$(echo "$tmp"|awk -F"$1" '{gsub(/[[0-9]*:[0-9]*\.[0-9]*]|\.[0-9]*]/,"\n ",$2);print $2}'| \
+        DIS_WORDS W "$(echo "$tmp"|awk -F"$1" '{gsub(/[[0-9]*:[0-9]*\.[0-9]*]|\.[0-9]*]/,"\n ",$2);print $2}'| \
         grep -A2 .|tr -d "\n")"
 	} }
 	fi
@@ -401,11 +407,11 @@ GET_STAT() {    #获取播放器的当前状态
         ((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
         ((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
         sleep $Sleeptm
-        [ "$n0" = "1" ] && [ ! "`pgrep $Player`" ] && echo -e "未发现被支持的播放器进程！" && exit
+        [ "$n0" = "1" ] && [ ! "`pgrep $Player`" ] && echo -e "lrcdisERROR未发现被支持的播放器进程！" && exit
         [ "$n0" = "1" ] && { 
 			pltm0="`GET_PLTM $Player`"
 			if [ "${pltm0:-0}" = "$pltm1" ]|| [ "$pltm0" = "" ];then
-				echo -e "播放器已停止或未开启！"
+				echo -e "lrcdisERROR播放器已停止或未开启！"
 				pass="continue"
 				sleep 3
 				continue
@@ -420,7 +426,7 @@ GET_STAT() {    #获取播放器的当前状态
         tmptm=${tmptm//.*/}
         tmptm=${tmptm:-0}
         ans="`printf '\n%.2d:%.2d\n' $(($tmptm/60)) $(($tmptm%60))`"
-		[ "$debug" = 1 ] && echo "GET_STATUS: $ans<<" >&2
+		
 		echo "$ans"
     done
 }
@@ -435,6 +441,7 @@ MAIN() {
     pltm="`GET_PLTM $Player`"
 
     GET_STAT |while read line0;do
+		[ "$debug" = 1 ] && echo "GET_STAT: $line0<<" >&2
         if [ "${line0//[0-9:]/}" ];then
             Title="$line0"
         else
@@ -443,19 +450,25 @@ MAIN() {
         [ "$line0" = "$line1" ] && continue
         line1="$line0"
 
-        [ "$title" != "$Title" ] && title="$Title" && DIS_WORDS "****** $Title ******" && sleep 1 && \
-        if [ "${Title//播放器已停止或未开启/}" != "$Title" -o "${Title//未发现被支持的播放器进程/}" != "$Title" ];then
-            continue
-        elif [ -f "$Lrcdir/$Title.lrc" ];then
-            lrc="$(< "$Lrcdir/$Title.lrc")"
-        else
-            DOWNLRC "$Title"
-            if [ -f "$Lrcdir/$Title.lrc" ];then
-                lrc="$(< "$Lrcdir/$Title.lrc")"
-            else
-                DIS_WORDS "******未能下载歌词******"
-            fi
-        fi
+        [ "$title" != "$Title" ] && {
+			title="$Title"
+			sleep 1
+			if [ "${Title//lrcdisERROR/}" != "$Title" ] ;then
+				DIS_WORDS E "${Title//lrcdisERROR/}"
+				continue
+			fi
+			DIS_WORDS T "$Title";
+			if [ -f "$Lrcdir/$Title.lrc" ] ;then
+				lrc="$(< "$Lrcdir/$Title.lrc")"
+			else
+				DOWNLRC "$Title"
+				if [ -f "$Lrcdir/$Title.lrc" ] ;then
+					lrc="$(< "$Lrcdir/$Title.lrc")"
+				else
+					DIS_WORDS E "未能下载歌词"
+				fi
+			fi
+		}
         [ "$lrc" ] && DISPLAY "$pltm" "$lrc"
     done
 }
@@ -505,7 +518,7 @@ Player="`CHECK_PLAYER`"
 if [ "$Player" ];then
 	sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"
 else
-	DIS_WORDS "未发现被支持的播放器进程！\n"
+	DIS_WORDS E "未发现被支持的播放器进程！\n"
 	exit
 fi
 MAIN

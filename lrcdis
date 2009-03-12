@@ -504,6 +504,7 @@ MAIN() {
 				if [ -f "$Lrcdir/$Title.lrc" ] ;then
 					lrc="$(< "$Lrcdir/$Title.lrc")"
 				else
+					lrc=""
 					DIS_WORDS E "未能下载歌词"
 				fi
 			fi

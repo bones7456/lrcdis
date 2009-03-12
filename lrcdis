@@ -154,8 +154,8 @@ SOGOU_URI(){
 	# 1 argument: gb
 	local htm a
 	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null`"
-	echo "$htm" | grep -im1 "downlrc"|awk -F"\"" '{print $2}' | read a
-	[ "$a" == "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
+	a="`echo "$htm" | grep -im1 "downlrc"|awk -F\" '{print $2}'`"
+	[ "$a" = "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
 }
 
 DOWNLRC(){      #下载歌词的函数

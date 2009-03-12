@@ -382,8 +382,7 @@ DIS_WORDS() {        #以各种预设的模式显示文字
             [ "$N" = "1" ] && \
             for i in `seq $Row`;do
                 tput cup "$i" 0
-                #FIXME 其实 $COLUMNS 读不到
-                for j in `seq ${COLUMNS:-80}`;do echo -n " "; done
+                echo -ne "\e[K"
             done
             tput cup "$N" 0
             echo -ne "\033[0;$Lyricscolor "${line/#]/}" \033[0m"
@@ -400,8 +399,7 @@ DIS_WORDS() {        #以各种预设的模式显示文字
 			fi
             for i in `seq 0 $Row`;do
                 tput cup "$i" 0
-                #FIXME 其实 $COLUMNS 读不到
-                for j in `seq ${COLUMNS:-80}`;do echo -n " "; done
+                echo -ne "\e[K"
             done
             tput cup 0 0
             echo -ne "\033[0;$Titlecolor $line \033[0m"

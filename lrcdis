@@ -152,10 +152,10 @@ BAIDU_URI(){
 }
 SOGOU_URI(){
 	# 1 argument: gb
-	local htm
-	echo -n 'http://mp3.sogou.com/'
+	local htm a
 	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null`"
-	echo "$htm" | grep -im1 "downlrc"|awk -F"\"" '{print $2}'
+	echo "$htm" | grep -im1 "downlrc"|awk -F"\"" '{print $2}' | read a
+	[ "$a" == "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
 }
 
 DOWNLRC(){      #下载歌词的函数
@@ -408,7 +408,8 @@ DIS_WORDS() {        #以各种预设的模式显示文字
                 echo -ne "\e[K"
             done
             tput cup 0 0
-            echo -ne "\033[0;$Titlecolor $line \033[0m"
+			a="`stty size`"
+            echo -ne "\033[0;$Titlecolor $line $a \033[0m"
             ((N=1))
         fi
 	fi
@@ -512,51 +513,48 @@ MAIN() {
     done
 }
 
+
 #===========================主流程==============================
 
 INIT
-case "$1" in
-"-h"|"--help")
-	USAGE
-	exit
-;;
-"-d"|"--download")
-	if [ "$2" ];then
-		DOWNLRC "$2" "$3"
-		if [ -f "$Save_dir/$2.lrc" ];then
-			echo "歌词文件 $Save_dir/$2.lrc 已保存。"
+#读取命令行参数
+while if ! getopts onfctevhd: param
+  then param=""; arg=${!OPTIND}; ((OPTIND++<=$#))
+  elif [ "$param" = "-" ]; then
+    param="--${OPTARG%%=*}"
+    arg="`[ "$param" = "--$OPTARG" ]||echo ${OPTARG#*=}=`";:
+  else param="-$param"; arg="$OPTARG=";:; fi; do
+  case "$param" in
+    -h|--help)USAGE;exit 0;;
+    -v|--version)echo $0" Version:"$Version;exit 0;;
+    -d|--download)
+		title="$OPTARG"
+		if [ "$title" ];then
+			DOWNLRC "$title"
+			if [ -f "$Save_dir/$title.lrc" ];then
+				echo "歌词文件 $Save_dir/$title.lrc 已保存。"
+			else
+				echo "歌词文件下载失败：（"
+			fi
 		else
-			echo "歌词文件下载失败：（"
+			echo "未输入歌曲名！"
 		fi
-	else
-		echo "未输入歌曲名！"
-	fi
-	exit
-;;
-"-o"|"--osd")
-	Dismode=osd
-;;
-"-n"|"--notify")
-	Dismode=notify
-;;
-"-f"|"--fifo")
-	Dismode=fifo
-	[ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo
-;;
-"-c"|"--cli")
-	Dismode=cli
-;;
-"-t"|"--title")
-	Dismode=title
-;;
-"-e"|"--echo")
-	Dismode=echo
-;;
-"-v"|"--version")
-	echo $0" Version:"$Version
-	exit
-;;
-esac
+		exit 0;;
+	"-o"|"--osd")    Dismode=osd;;
+	"-n"|"--notify") Dismode=notify;;
+	"-f"|"--fifo")
+		Dismode=fifo
+		[ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo
+	;;
+	"-c"|"--cli")    Dismode=cli;;
+	"-t"|"--title")  Dismode=title;;
+	"-e"|"--echo")   Dismode=echo;;
+    "")
+      gettext "Parameter not used: " 1>&2
+      echo "$arg" 1>&2
+      ;;
+  esac
+done
 
 sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
 Player="`CHECK_PLAYER`"

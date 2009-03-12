@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 Version=svn-090312
 #是否开启调试信息
-debug=1
+debug=0
 Conf_file=~/.config/lrcdis.conf
 
 #=========================定义函数=============================
@@ -153,8 +153,10 @@ BAIDU_URI(){
 SOGOU_URI(){
 	# 1 argument: gb
 	local htm a
-	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null`"
-	a="`echo "$htm" | grep -im1 "downlrc"|awk -F\" '{print $2}'`"
+	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
+	#[ "$debug" = 1 ] && echo "HTM $htm" > /tmp/htm
+	a="`echo "$htm" | grep -im1 "downlrc"|awk -F\\\" '{print $2}'`"
+	[ "$debug" = 1 ] && echo "A $a" >&2
 	[ "$a" = "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
 }
 
@@ -427,8 +429,9 @@ DISPLAY() {		 #显示歌词函数
 		#亦即即使你把歌曲文件连成只有一行也能正确显示而不会掉词。
 		[ "$Tm" != "$1" ] && Tm="$1" && { #只显示与上次时间不一样的
 		tmp="`echo -e "$2"|grep "$1."`" && [ "$tmp" ] && { #找到该行
-		DIS_WORDS W "$(echo "$tmp"|awk -F"$1" '{gsub(/[[0-9]*:[0-9]*\.[0-9]*]|\.[0-9]*]/,"\n",$2);print $2}'| \
-		grep -A2 .|tr -d "\n")"
+		DIS_WORDS W "`echo "$tmp"|awk -F"$1" \
+		'{gsub(/(\[[0-9]*:[0-9]*\.[0-9]*\])|(\.[0-9]*\])/,"\n",$2);print $2}' \
+		| grep -v '^$' | head -n 1`"
 	} }
 	fi
 }
@@ -518,7 +521,7 @@ MAIN() {
 
 INIT
 #读取命令行参数
-while if ! getopts onfctevhd: param
+while if ! getopts onfctevhd:D param
   then param=""; arg=${!OPTIND}; ((OPTIND++<=$#))
   elif [ "$param" = "-" ]; then
 	param="--${OPTARG%%=*}"
@@ -540,15 +543,16 @@ while if ! getopts onfctevhd: param
 			echo "未输入歌曲名！"
 		fi
 		exit 0;;
-	"-o"|"--osd")	Dismode=osd;;
-	"-n"|"--notify") Dismode=notify;;
-	"-f"|"--fifo")
+	-o|--osd) Dismode=osd;;
+	-n|--notify) Dismode=notify;;
+	-f|--fifo)
 		Dismode=fifo
 		[ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo
 	;;
-	"-c"|"--cli")	Dismode=cli;;
-	"-t"|"--title")  Dismode=title;;
-	"-e"|"--echo")   Dismode=echo;;
+	-c|--cli) Dismode=cli;;
+	-t|--title) Dismode=title;;
+	-e|--echo) Dismode=echo;;
+	-D|--debug) debug=1;;
 	"")
 	  gettext "Parameter not used: " 1>&2
 	  echo "$arg" 1>&2

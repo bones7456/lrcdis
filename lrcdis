@@ -408,8 +408,7 @@ DIS_WORDS() {        #以各种预设的模式显示文字
                 echo -ne "\e[K"
             done
             tput cup 0 0
-			a="`stty size`"
-            echo -ne "\033[0;$Titlecolor $line $a \033[0m"
+            echo -ne "\033[0;$Titlecolor $line \033[0m"
             ((N=1))
         fi
 	fi

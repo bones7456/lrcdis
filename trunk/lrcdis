@@ -3,7 +3,7 @@
 # License:  GPLv3
 # Credit:   xiooli,solcomo,bones7456,oldherl  (2008-2009)
 # Encoding: UTF-8
-Version=svn-090311
+Version=svn-090312
 #是否开启调试信息
 debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -342,7 +342,7 @@ DIS_WORDS() {        #以各种预设的模式显示文字
 
     #两个参数; $1:T标题W普通歌词E错误信息  正确执行按照Dismode将 $2 格式化输出
 
-    local line i NL
+    local line i j NL
 
     line="$2"
     NL="\n "
@@ -382,7 +382,8 @@ DIS_WORDS() {        #以各种预设的模式显示文字
             [ "$N" = "1" ] && \
             for i in `seq $Row`;do
                 tput cup "$i" 0
-                echo -n "                                                                                                 "
+                #FIXME 其实 $COLUMNS 读不到
+                for j in `seq ${COLUMNS:-80}`;do echo -n " "; done
             done
             tput cup "$N" 0
             echo -ne "\033[0;$Lyricscolor "${line/#]/}" \033[0m"
@@ -399,7 +400,8 @@ DIS_WORDS() {        #以各种预设的模式显示文字
 			fi
             for i in `seq 0 $Row`;do
                 tput cup "$i" 0
-                echo -n "                                                                                                 "
+                #FIXME 其实 $COLUMNS 读不到
+                for j in `seq ${COLUMNS:-80}`;do echo -n " "; done
             done
             tput cup 0 0
             echo -ne "\033[0;$Titlecolor $line \033[0m"

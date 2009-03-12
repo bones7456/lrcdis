@@ -108,6 +108,8 @@ USAGE() {   #显示帮助信息的函数
             自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
         -t, --title
             自动检查播放器并将歌词输出到gnome-terminal之类的title里
+        -e, --echo
+            自动检查播放器并将歌词以普通echo模式输出
         -c, --cli
             自动检查播放器并以cli模式显示歌词
         -v, --version
@@ -376,6 +378,10 @@ DIS_WORDS() {        #以各种预设的模式显示文字
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		echo -ne "\e]0;$line\a"
+	elif [ "$Dismode" = "echo" ];then
+		[ "$1" = T ] && line="****** $line ******"
+		[ "$1" = E ] && line="错误: $line"
+		echo "$line"
 	else
         if [ "$1" = W ] ;then
             N="${N:-1}"
@@ -542,6 +548,9 @@ case "$1" in
 ;;
 "-t"|"--title")
 	Dismode=title
+;;
+"-e"|"--echo")
+	Dismode=echo
 ;;
 "-v"|"--version")
 	echo $0" Version:"$Version

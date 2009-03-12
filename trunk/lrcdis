@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 Version=svn-090311
 #是否开启调试信息
-debug=1
+debug=0
 Conf_file=~/.config/lrcdis.conf
 
 #=========================定义函数=============================
@@ -106,6 +106,8 @@ USAGE() {   #显示帮助信息的函数
             自动检查播放器并以notify模式显示歌词
         -f, --fifo
             自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
+        -t, --title
+            自动检查播放器并将歌词输出到gnome-terminal之类的title里
         -c, --cli
             自动检查播放器并以cli模式显示歌词
         -v, --version
@@ -169,7 +171,7 @@ DOWNLRC(){      #下载歌词的函数
 
 	#从baidu搜索里面找出当前歌曲的歌词下载页
 	#FIXME: just for a try
-  	link="`BAIDU_URI "$gb"`"
+  	link="`SOGOU_URI "$gb"`"
 	[ "$debug" = 1 ] && echo "Link: $link" >&2
   	while [ "$link" ] && [ ! -s "$Save_dir/$nm.lrc" ];do
 		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c -o "$Save_dir/$nm.lrc"
@@ -370,6 +372,10 @@ DIS_WORDS() {        #以各种预设的模式显示文字
 		else
 			notify-send -c lrcdis -t "$Timeout" "$line"
 		fi
+	elif [ "$Dismode" = "title" ];then
+		[ "$1" = T ] && line="****** $line ******"
+		[ "$1" = E ] && line="错误: $line"
+		echo -ne "\e]0;$line\a"
 	else
         if [ "$1" = W ] ;then
             N="${N:-1}"
@@ -533,6 +539,9 @@ case "$1" in
 ;;
 "-c"|"--cli")
 	Dismode=cli
+;;
+"-t"|"--title")
+	Dismode=title
 ;;
 "-v"|"--version")
 	echo $0" Version:"$Version

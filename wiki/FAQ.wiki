@@ -27,3 +27,31 @@ for i in *mp3;do ar="`mid3v2 -l "$i" |grep TPE1 |sed 's/^.*=//'`"; ti="`mid3v2 -
 既可下载整个目录的歌词文件了。
 
 以后离线播放也不用怕了。
+
+= 怎么显示mplayer播放歌曲的歌词？ =
+
+要让lrcdis显示mplayer的歌词有点麻烦（不过咱linuxer不是就图个折腾么：）），安照下面的命令启动mplayer即可：
+
+{{{
+mkfifo /dev/shm/{mfifo,ififo}
+mplayer yourmusic.mp3 -msglevel all=4 -input file=/dev/shm/mfifo|while read a;do [ "${a//ANS/}" != "$a" ] &&  echo $a>/dev/shm/ififo ;done
+}}}
+
+= 在kde4下使用plasma插件STDIN来输出歌词 =
+
+plasma插件STDIN，这个插件可以定时执行一个命令/脚本，然后将其结果输出到插件上。你只需将STDIN所执行的命令设定为：
+{{{
+cat </dev/shm/lrcfifo
+}}}
+执行间隔为1秒即可（再短也没有了：（），然后让lrcdis以参数-f/--fifo运行。
+下载地址：
+
+1，STDIN：http://www.kde-look.org/content/show.php/STDIN+Plasmoid?content=92309
+
+2，lrcdis：http://code.google.com/p/lrcdis/source/browse/#svn/trunk
+
+或用svn来checkout：
+
+svn checkout http://lrcdis.googlecode.com/svn/trunk/ lrcdis-read-only
+
+这里有一段演示视频：http://www.youtube.com/watch?v=i9wO3lI-XE0

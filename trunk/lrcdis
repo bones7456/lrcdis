@@ -3,7 +3,7 @@
 # License:  GPLv3
 # Credit:   xiooli,solcomo,bones7456,oldherl  (2008-2009)
 # Encoding: UTF-8
-Version=svn-090312
+Version=090313
 #是否开启调试信息
 debug=0
 Conf_file=~/.config/lrcdis.conf

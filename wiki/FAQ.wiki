@@ -48,10 +48,6 @@ cat </dev/shm/lrcfifo
 
 1，STDIN：http://www.kde-look.org/content/show.php/STDIN+Plasmoid?content=92309
 
-2，lrcdis：http://code.google.com/p/lrcdis/source/browse/#svn/trunk
-
-或用svn来checkout：
-
-svn checkout http://lrcdis.googlecode.com/svn/trunk/ lrcdis-read-only
+2，lrcdis：http://code.google.com/p/lrcdis/downloads/list
 
 这里有一段演示视频：http://www.youtube.com/watch?v=i9wO3lI-XE0

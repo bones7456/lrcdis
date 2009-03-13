@@ -380,9 +380,9 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		if [ -n "$NotifyIcon" ];then
-			notify-send -c lrcdis -i "$NotifyIcon" -t "$Timeout" "$line"
+			notify-send -c lrcdis -i "$NotifyIcon" -t "$Timeout" -- "$line"
 		else
-			notify-send -c lrcdis -t "$Timeout" "$line"
+			notify-send -c lrcdis -t "$Timeout" -- "$line"
 		fi
 	elif [ "$Dismode" = "title" ];then
 		[ "$1" = T ] && line="****** $line ******"
@@ -446,7 +446,7 @@ DISPLAY() {		 #显示歌词函数
 
 GET_STAT() {	#获取播放器的当前状态
 
-	#参数一个，offset，有两个独立的时间循环，一个用于产生时间信号（独立于播放器的时间信号，一定循环次数以后与播放器的时间相校准，
+	#没有参数，有两个独立的时间循环，一个用于产生时间信号（独立于播放器的时间信号，一定循环次数以后与播放器的时间相校准，
 	#这样减少了获取播放器时间的次数，减少 cpu 开支，但是在有拖动时可能反应有一点延迟）；另一个用于间隔一定时间后获取标题
 	#Every line is made up of two parts: 
 	#  Title This Song is Great

@@ -353,7 +353,8 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 	local line i j NL
 
 	line="$2"
-	NL="\n "
+	NL="
+ "
 	#[ "$2" = "" ] && exit
 
 	if [ "$Dismode" = "osd" -a "`which gnome-osd-client 2>/dev/null`" ];then
@@ -367,14 +368,14 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 				line="$line$NL"
 			fi
 		fi
-		#NOTE: 下面的echo是需要的，不然\n会直接显示出来。
-		gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>`echo -ne "$line"`</span></message>"
+		gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>$line</span></message>"
 	elif [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		cat < /dev/shm/lrcfifo &
 		echo -ne "$line" > /dev/shm/lrcfifo
 	elif [ "$Dismode" = "notify" -a "`which notify-send 2>/dev/null`" ];then
+		[ "$2" = "" ] && return
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		if [ -n "$NotifyIcon" ];then

@@ -1,4 +1,4 @@
-#labels Featured
+#labels Featured,Phase-QA
 = lrcdis是什么？ =
 
 lrcdis是一个外挂式显歌词的脚本，特点是简单易用，只需下载后做为普通脚本执行即可，可以自动检测播放器，无须以插件的方式另外安装。

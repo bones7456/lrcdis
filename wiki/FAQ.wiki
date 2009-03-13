@@ -1,4 +1,18 @@
 #labels Featured
+= lrcdis是什么？ =
+
+lrcdis是一个外挂式显歌词的脚本，特点是简单易用，只需下载后做为普通脚本执行即可，可以自动检测播放器，无须以插件的方式另外安装。
+
+目前支持的播放器有mpd, mocp, audacious, amarok, exaile, quodlibet, rhythmbox, mplayer。
+
+目前支持 CLI，OSD，nitify，fifo，title，echo等输出方式。
+
+为了让大家对lrcdis有个直观的了解，上一张截图，所谓一图胜千言嘛。
+
+[http://li2z.cn/wp-content/uploads/2009/03/lrcdis.png http://li2z.cn/wp-content/uploads/2009/03/lrcdis600x.png]
+
+[http://li2z.cn/wp-content/uploads/2009/03/lrcdis.png 点击]查看原始大小图片
+
 = 如何使用该脚本？ =
 
 下载，解压，在播放器已经打开的情况下，直接运行该脚本即可（注意可执行权限）。

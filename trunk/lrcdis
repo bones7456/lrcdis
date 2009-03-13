@@ -180,8 +180,9 @@ DOWNLRC(){	  #下载歌词的函数
   	while [ "$link" ] && [ ! -s "$Save_dir/$nm.lrc" ];do
 		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$Save_dir/$nm.lrc"
 		{ echo '<xml>'; cat "$Save_dir/$nm.lrc"; echo '</xml>';} > /tmp/lrcdisTMP.xml
-		xmllint /tmp/lrcdisTMP.xml 2>/dev/null > /tmp/lrcdisTMP.lrc && \
-			mv /tmp/lrcdisTMP.lrc "$Save_dir/$nm.lrc"
+		xmllint /tmp/lrcdisTMP.xml --encode UTF-8 2>/dev/null > /tmp/lrcdisTMP.lrc && {
+			cat /tmp/lrcdisTMP.lrc | head -n -1 | tail -n +3 > "$Save_dir/$nm.lrc"
+		}
 		rm /tmp/lrcdisTMP* &>/dev/null
 	done
 }

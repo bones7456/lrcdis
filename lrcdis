@@ -379,9 +379,9 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		if [ -n "$NotifyIcon" ];then
-			notify-send -c lrcdis -i "$NotifyIcon" -t "$Timeout" "$line"
+			notify-send -c lrcdis -i "$NotifyIcon" -t "$Timeout" -- "$line"
 		else
-			notify-send -c lrcdis -t "$Timeout" "$line"
+			notify-send -c lrcdis -t "$Timeout" -- "$line"
 		fi
 	elif [ "$Dismode" = "title" ];then
 		[ "$1" = T ] && line="****** $line ******"

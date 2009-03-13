@@ -94,32 +94,33 @@ USAGE() {   #显示帮助信息的函数
 	#没有参数，执行显示帮助信息
 
 	cat << EOF
-	
-	用法： $0 [选项] [参数]
-	选项：
-		-h, --help
-			显示本帮助信息并退出
-		-d, --download 
-			其后跟的参数为：  歌曲名 保存路径
-			不写路径则保存至默认目录 ${Lrcdir:-~/.lyrics}
-		-o, --osd
-			自动检查播放器并以osd模式显示歌词
-		-n, --notify
-			自动检查播放器并以notify模式显示歌词
-		-f, --fifo
-			自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
-		-t, --title
-			自动检查播放器并将歌词输出到gnome-terminal之类的title里
-		-e, --echo
-			自动检查播放器并将歌词以普通echo模式输出
-		-c, --cli
-			自动检查播放器并以cli模式显示歌词
-		-v, --version
-			显示版本号并退出
-	备注：
-		不加任何参数则以 $Conf_file 
-		为配置文件初始化运行
-
+用法： $0 [选项] [参数]
+选项：
+	-d, --download <歌曲名>
+		仅下载歌词, 保存至默认目录 ${Lrcdir:-~/.lyrics}
+	-C, --config <config file name>
+		specify config file name (default: ~/.config/lrcdis.conf)
+	-m, --mode <Dismode>
+		Display in that mode. (osd, cli, notify, fifo, title, echo)
+	-o, --osd
+		自动检查播放器并以osd模式显示歌词
+	-n, --notify
+		自动检查播放器并以notify模式显示歌词
+	-f, --fifo
+		自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
+	-t, --title
+		自动检查播放器并将歌词输出到gnome-terminal之类标题中
+	-e, --echo
+		自动检查播放器并将歌词以普通echo模式输出
+	-c, --cli
+		自动检查播放器并以cli模式显示歌词
+	-D, --debug
+		debug mode
+	-h, --help
+		显示本帮助信息并退出
+	-v, --version
+		显示版本号并退出
+	备注：不加任何参数则以 $Conf_file 为配置文件初始化运行
 EOF
 }
 
@@ -488,16 +489,12 @@ GET_STAT() {	#获取播放器的当前状态
 
 INIT
 #读取命令行参数
-while if ! getopts onfctevhd:D param
-  then param=""; arg=${!OPTIND}; ((OPTIND++<=$#))
-  elif [ "$param" = "-" ]; then
-	param="--${OPTARG%%=*}"
-	arg="`[ "$param" = "--$OPTARG" ]||echo ${OPTARG#*=}=`";:
-  else param="-$param"; arg="$OPTARG=";:; fi; do
+while getopts onfctm:eC:vp:hd:D param ; do
   case "$param" in
-	-h|--help)USAGE;exit 0;;
-	-v|--version)echo $0" Version:"$Version;exit 0;;
-	-d|--download)
+	h|--help)USAGE;exit 0;;
+	v|--version)echo $0" Version:"$Version;exit 0;;
+	C|--config) Conf_file="$OPTARG";INIT;;
+	d|--download)
 		title="$OPTARG"
 		if [ "$title" ];then
 			DOWNLRC "$title"
@@ -510,22 +507,26 @@ while if ! getopts onfctevhd:D param
 			echo "未输入歌曲名！"
 		fi
 		exit 0;;
-	-o|--osd) Dismode=osd;;
-	-n|--notify) Dismode=notify;;
-	-f|--fifo)
-		Dismode=fifo
-		[ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo
-	;;
-	-c|--cli) Dismode=cli;;
-	-t|--title) Dismode=title;;
-	-e|--echo) Dismode=echo;;
-	-D|--debug) debug=1;;
+	s|--save-dir) Save_dir="$OPTARG";;
+	p|--player) Player="$OPTARG";;
+	m|--mode) Dismode="$OPTARG";;
+	o|--osd) Dismode=osd;;
+	n|-notify) Dismode=notify;;
+	f|--fifo) Dismode=fifo;;
+	c|--cli) Dismode=cli;;
+	t|--title) Dismode=title;;
+	e|--echo) Dismode=echo;;
+	D|--debug) debug=1;;
+	#-*)gettext "No such option: ">&2; echo "$param"; exit 1;;
 	"")
 	  gettext "Parameter not used: " 1>&2
 	  echo "$arg" 1>&2
 	  ;;
   esac
 done
+shift $((OPTIND-1))
+
+[ "$Dismode" = "fifo" ] && { [ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo; }
 
 sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
 Player="`CHECK_PLAYER`"

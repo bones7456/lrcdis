@@ -357,6 +357,7 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 	#[ "$2" = "" ] && exit
 
 	if [ "$Dismode" = "osd" -a "`which gnome-osd-client 2>/dev/null`" ];then
+		line=`echo $line | sed "s/&/\&amp;/g" | sed "s/</\&lt;/g" | sed "s/>/\&gt;/g"`
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		if [ "$Addnewline" = "on" ];then

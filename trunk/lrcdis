@@ -3,6 +3,8 @@
 # License:  GPLv3
 # Credit:   xiooli,solcomo,bones7456,oldherl  (2008-2009)
 # Encoding: UTF-8
+# Thanks to: 搜狗歌词搜索
+
 Version=svn-090313
 #是否开启调试信息
 debug=0
@@ -176,8 +178,11 @@ DOWNLRC(){	  #下载歌词的函数
   	link="`SOGOU_URI "$gb"`"
 	[ "$debug" = 1 ] && echo "Link: $link" >&2
   	while [ "$link" ] && [ ! -s "$Save_dir/$nm.lrc" ];do
-		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c -o "$Save_dir/$nm.lrc"
-		[ -s "$Lrcdir/$nm.lrc" ] && sed -i "s/\r//g" "$Save_dir/$nm.lrc" #去掉dos字符
+		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$Save_dir/$nm.lrc"
+		{ echo '<xml>'; cat "$Save_dir/$nm.lrc"; echo '</xml>';} > /tmp/lrcdisTMP.xml
+		xmllint /tmp/lrcdisTMP.xml 2>/dev/null > /tmp/lrcdisTMP.lrc && \
+			mv /tmp/lrcdisTMP.lrc "$Save_dir/$nm.lrc"
+		rm /tmp/lrcdisTMP* &>/dev/null
 	done
 }
 

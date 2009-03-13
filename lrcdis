@@ -3,7 +3,7 @@
 # License:  GPLv3
 # Credit:   xiooli,solcomo,bones7456,oldherl  (2008-2009)
 # Encoding: UTF-8
-Version=090313
+Version=svn-090313
 #是否开启调试信息
 debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -359,8 +359,9 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 			else
 				line="$line$NL"
 			fi
-		fi	
-		gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>$line</span></message>"
+		fi
+		#NOTE: 下面的echo是需要的，不然换行符会直接显示出来。
+		gnome-osd-client -f "<message id='lrcdis' osd_fake_translucent_bg='off' osd_vposition='$Vposition' osd_halignment='$Halignment' animations='$Animations' hide_timeout='$Timeout'><span size='$Size' foreground='$Foreground'>`echo -ne "$line"`</span></message>"
 	elif [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"

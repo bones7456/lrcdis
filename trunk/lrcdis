@@ -308,11 +308,8 @@ GET_PLTM() {
 		}
 	;;
 	"mocp")
-		tm="`mocp -i | grep "CurrentTime" | sed -e 's/CurrentTime:\ //'`"
-		min=${tm//:*/}
-		tmptm=${tm//*:/}
-		sec=${tmptm/#0/}
-		[ "$tm" ] && echo $(($min*60+$sec))
+		tm="`mocp -i | grep "^CurrentSec: " | sed -e 's/CurrentSec:\ //'`"
+		[ "$tm" ] && echo $(($tm))
 	;;
 	"audacious")
 		tm="`audtool current-song-output-length-seconds`"
@@ -349,6 +346,58 @@ GET_PLTM() {
 		echo "get_time_pos">/dev/shm/mfifo
 		tm="`cat "/dev/shm/ififo"|sed 's/^.*=//;s/\..*$//'`"
 		[ "${tm//-/}" = "$tm" -a "$tm" != "0" ] && echo "$tm"
+	;;
+	esac
+
+}
+
+GET_LEN() {
+	
+   #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
+   # not used in the preogram since it's not done...  --oldherl
+   
+	local tm min sec tmptm
+
+	case "${1:-rhythmbox}" in
+	"mpd")
+		tm="`mpc --format "%time%" | head -n -2`"
+		[ "$Debug" = 1 ] && echo "GET_LEN: ${tm}<<" >&2
+		[ -n "$tm" ] && {
+			min=${tm//:*/}
+			tmptm=${tm//*:/}
+			sec=${tmptm/#0/}
+			echo "$(($min*60+$sec))"
+		}
+	;;
+	"mocp")
+		tm="`mocp -i | grep "^TotalSec: " | sed -e 's/TotalSec:\ //'`"
+		[ "$tm" ] && echo $(($tm))
+	;;
+	"audacious")
+		tm="`audtool current-song-length-seconds`"
+		[ "$tm" ] && echo "$tm"
+	;;
+	"amarok")
+		#TODO
+	;;
+	"exaile")
+		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_length \
+		| tail -n 1 |awk -F\" '{print $2}'`"
+		min=${tm//:*/}
+		tmptm=${tm//*:/}
+		sec=${tmptm/#0/}
+		[ "$tm" ] && echo $(($min*60+$sec))
+	;;
+	"quodlibet")
+		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong| \
+		grep -FA1 string\ \"~#length\" | tail -n 1 | cut -d\" -f2 `"
+		[ "$tm" ] && echo "$tm"
+	;;
+	"rhythmbox")
+		#TODO
+	;;
+	"mplayer")
+		#TODO
 	;;
 	esac
 

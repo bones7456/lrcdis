@@ -246,13 +246,15 @@ GET_TITLE() {	   #获取当前播放的歌曲名字
 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			t="`qdbus org.kde.amarok /Player GetMetadata|grep "^title:"|sed "s/title: *//"`"
-			a="`qdbus org.kde.amarok /Player GetMetadata|grep "^artist:"|sed "s/artist: *//"`"
-		if [ "$t" -a "$a" ];then
-			echo "$a" - "$t"
-		else
-			echo "$t"
-		fi
+			t="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
+			|grep -FA1 'string "title"'|tail -n1|awk -F'"' '{print $2}'`"
+			a="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
+			|grep -FA1 'string "artist"'|tail -n1|awk -F'"' '{print $2}'`"
+			if [ "$t" -a "$a" ];then
+				echo "$a" - "$t"
+			else
+				echo "$t"
+			fi
 		else
 			dcop amarok player nowPlaying|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'
 		fi
@@ -271,8 +273,8 @@ GET_TITLE() {	   #获取当前播放的歌曲名字
 	;;
 	"quodlibet")
 		sn="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong`"
-		a="`echo "$sn" | grep -FA1 '   string "artist' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
-		t="`echo "$sn" | grep -FA1 '   string "title' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		a="`echo "$sn" | grep -FA1 'string "artist' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		t="`echo "$sn" | grep -FA1 'string "title' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		echo "$a" - "$t"
 	;;
 	"rhythmbox")
@@ -283,7 +285,7 @@ GET_TITLE() {	   #获取当前播放的歌曲名字
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
 		echo "get_file_name">/dev/shm/mfifo
-		t="`cat "/dev/shm/ififo"|awk -F"\'" '/^ANS_FILENAME/{gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$2);print $2}'`"
+		t="`cat "/dev/shm/ififo"|awk -F"'" '/^ANS_FILENAME/{gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$2);print $2}'`"
 		[ "$t" ] && echo "$t"
 	;;
 	esac
@@ -317,7 +319,7 @@ GET_PLTM() {
 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			tm="`qdbus org.kde.amarok /Player PositionGet`"
+			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet|grep int32|awk '{print $2}'`"
 			tm=$(($tm/1000))
 		else
 			tm="`dcop amarok player trackCurrentTime`"
@@ -371,14 +373,15 @@ GET_LEN() {
 	;;
 	"mocp")
 		tm="`mocp -i | grep "^TotalSec: " | sed -e 's/TotalSec:\ //'`"
-		[ "$tm" ] && echo $(($tm))
+		[ "$tm" ] && echo $tm
 	;;
 	"audacious")
 		tm="`audtool current-song-length-seconds`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"amarok")
-		#TODO
+		tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata|grep -FA1 'string "mtime"'|tail -n1|awk '{print $3}'`"
+		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"exaile")
 		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_length \
@@ -397,7 +400,10 @@ GET_LEN() {
 		#TODO
 	;;
 	"mplayer")
-		#TODO
+		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
+		echo "get_time_length">/dev/shm/mfifo
+		tm="`cat "/dev/shm/ififo"|sed 's/ANS_LENGTH=//;s/\..*$//'`"
+		[ "$tm" ] && echo "$tm"
 	;;
 	esac
 

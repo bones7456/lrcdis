@@ -354,7 +354,7 @@ GET_PLTM() {
 GET_LEN() {
 	
    #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
-   # not used in the preogram since it's not done...  --oldherl
+   # not used in the program since it's not done...  --oldherl
    
 	local tm min sec tmptm
 

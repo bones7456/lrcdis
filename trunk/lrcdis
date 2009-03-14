@@ -74,7 +74,8 @@ smoothgreen="38;5;42m"
 EOF
 
 	. "$Conf_file" #在这里如果source一次的话颜色代码不会工作，大家看看怎么改。（source两次太恶了）-- xiooli
-	[ ! -d "$Lrcdir" ] && mkdir -p "$Lrcdir"
+	# how about save color codes into another file named "lrcdis.colors"
+	#sorry for not typing Chinese because of editor's bug   --oldherl
 	. "$Conf_file"
 }
 
@@ -94,33 +95,39 @@ USAGE() {   #显示帮助信息的函数
 	#没有参数，执行显示帮助信息
 
 	cat << EOF
-用法： $0 [选项] [参数]
+lrcdis $Version (http://code.google.com/p/lrcdis)
+用法： $0 [选项]
 选项：
-	-d, --download <歌曲名>
-		仅下载歌词, 保存至默认目录 ${Lrcdir:-~/.lyrics}
-	-C, --config <config file name>
+
+	-C <Config file name>
 		specify config file name (default: ~/.config/lrcdis.conf)
-	-m, --mode <Dismode>
-		Display in that mode. (osd, cli, notify, fifo, title, echo)
-	-o, --osd
-		自动检查播放器并以osd模式显示歌词
-	-n, --notify
-		自动检查播放器并以notify模式显示歌词
-	-f, --fifo
-		自动检查播放器并将歌词输出到管道文件/dev/shm/lrcfifo
-	-t, --title
-		自动检查播放器并将歌词输出到gnome-terminal之类标题中
-	-e, --echo
-		自动检查播放器并将歌词以普通echo模式输出
-	-c, --cli
-		自动检查播放器并以cli模式显示歌词
-	-D, --debug
+	-s <Save directory>
+		specify directory to save lyrics (default: ~/.lyrics)
+	-d <歌曲名>
+		仅下载歌词, 保存至歌词目录
+	-p <Player>
+		Try that player first. Will search for others if not present.
+	-m <Dismode>
+		Display in that mode. (See following)
+	-m osd
+		以osd模式显示歌词(needs gnome-osd)
+	-m notify
+		以notify模式显示歌词(needs notify-send)
+	-m fifo
+		将歌词输出到管道文件/dev/shm/lrcfifo
+	-m title
+		将歌词输出到终端的标题中(支持大多数终端)
+	-m echo
+		将歌词以普通echo模式输出
+	-m cli
+		以cli模式显示歌词
+	-D
 		Debug mode
-	-h, --help
+	-h
 		显示本帮助信息并退出
-	-v, --version
+	-v
 		显示版本号并退出
-	备注：不加任何参数则以 $Conf_file 为配置文件初始化运行
+	备注：不加任何选项则以 $Conf_file 为配置文件初始化运行
 EOF
 }
 
@@ -165,12 +172,12 @@ DOWNLRC(){	  #下载歌词的函数
 
 	#参数一个，$1 (str)： 歌曲名字; 没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
 
-	local nm link full_link gb
+	local nm link full_link gb file
 
 	nm="$1"
-	Save_dir="${2:-$Lrcdir}"
-	Save_dir="${Save_dir/%\//}"
-
+	[ ! -d "$Lrcdir" ] && mkdir -p "$Lrcdir"
+	file="$Lrcdir/$nm.lrc"
+	
 	#将歌曲名字转换为urlencode，utf-8的locale必须先转换为gbk的编码
   	gb="$(echo -n "$nm" | iconv -c -t gbk | od -t x1 -A n -w1000|tr " " "%")"
 
@@ -178,11 +185,11 @@ DOWNLRC(){	  #下载歌词的函数
 	#FIXME: just for a try
   	link="`SOGOU_URI "$gb"`"
 	[ "$Debug" = 1 ] && echo "Link: $link" >&2
-  	while [ "$link" ] && [ ! -s "$Save_dir/$nm.lrc" ];do
-		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$Save_dir/$nm.lrc"
-		{ echo '<xml>'; cat "$Save_dir/$nm.lrc"; echo '</xml>';} > /tmp/lrcdisTMP.xml
+  	while [ "$link" ] && [ ! -s "$file" ];do
+		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
+		{ echo '<xml>'; cat "$file"; echo '</xml>';} > /tmp/lrcdisTMP.xml
 		xmllint /tmp/lrcdisTMP.xml --encode UTF-8 2>/dev/null > /tmp/lrcdisTMP.lrc && {
-			cat /tmp/lrcdisTMP.lrc | head -n -1 | tail -n +3 > "$Save_dir/$nm.lrc"
+			cat /tmp/lrcdisTMP.lrc | head -n -1 | tail -n +3 > "$file"
 		}
 		rm /tmp/lrcdisTMP* &>/dev/null
 	done
@@ -484,7 +491,7 @@ HANDLE_PARAM() { 	#读取并处理命令行参数
 	#参数 $@ 从命令行传入。
 
 	local param arg title
-	while getopts onfctm:eC:vp:hd:D param ; do
+	while getopts hvC:d:s:p:m:onfcteD param ; do
 		case "$param" in
 			h|--help)USAGE;exit 0;;
 			v|--version)echo $0" Version:"$Version;exit 0;;
@@ -502,7 +509,7 @@ HANDLE_PARAM() { 	#读取并处理命令行参数
 					echo "未输入歌曲名！"
 				fi
 				exit 0;;
-			s|--save-dir) Save_dir="$OPTARG";;
+			s|--save-dir) Lrcdir="$OPTARG";;
 			p|--player) Player="$OPTARG";;
 			m|--mode) Dismode="$OPTARG";;
 			o|--osd) Dismode=osd;;

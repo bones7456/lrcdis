@@ -253,7 +253,7 @@ GET_TITLE() {	   #获取当前播放的歌曲名字
 	"exaile")
 		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title \
 			| sed -n '$p'|awk -F'"' '{print $2}'`"
-		tmp="`echo "$t"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'`"
+		tmp="`DO_NAME "$t"`"
 		if [ "$tmp" != "$t" ] ; then
 			echo "$tmp"
 		else
@@ -322,7 +322,7 @@ GET_PLTM() {
 	;;
 	"exaile")
 		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query \
-		| sed -n '$p'|awk -F[][] '{print $2}'`"
+		| tail -c 10 |awk -F[][] '{print $2}'`"
 		min=${tm//:*/}
 		tmptm=${tm//*:/}
 		sec=${tmptm/#0/}

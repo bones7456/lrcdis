@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090313
+Version=svn-090315
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -450,11 +450,7 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
 		echo -ne "\e]0;$line\a"
-	elif [ "$Dismode" = "echo" ];then
-		[ "$1" = T ] && line="****** $line ******"
-		[ "$1" = E ] && line="错误: $line"
-		echo "$line"
-	else
+	elif [ "$Dismode" = "cli" ];then
 		if [ "$1" = W ] ;then
 			N="${N:-1}"
 			[ "$N" = "1" ] && \
@@ -483,6 +479,10 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 			echo -ne "\033[0;$Titlecolor $line \033[0m"
 			((N=1))
 		fi
+	else
+		[ "$1" = T ] && line="****** $line ******"
+		[ "$1" = E ] && line="错误: $line"
+		echo "$line"
 	fi
 }
 
@@ -589,7 +589,14 @@ HANDLE_PARAM() { 	#读取并处理命令行参数
 
 INIT
 HANDLE_PARAM $@
-sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
+case "$Dismode" in
+	osd|notify|fifo|title|cli|echo)
+	sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
+	;;
+	*)
+	echo "无效的显示模式: $Dismode ,用默认的 echo 模式替代."
+	;;
+esac
 Player="`CHECK_PLAYER`"
 if [ "$Player" ];then
 	sed -i "s/^Player=.*/Player=$Player/" "$Conf_file"

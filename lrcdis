@@ -12,7 +12,8 @@ Conf_file=~/.config/lrcdis.conf
 
 #=========================定义函数=============================
 
-INIT() {	#程序初始化函数
+INIT() {
+	#程序初始化函数
 
 	#没有参数，正确执行如果没有配置文件则会产生配置文件并加载配置，有配置文件则加载配置文件
 
@@ -90,8 +91,8 @@ DO_NAME() {
 	echo "$a"
 }
 
-USAGE() {   #显示帮助信息的函数
-
+USAGE() {
+	#显示帮助信息的函数
 	#没有参数，执行显示帮助信息
 
 	cat << EOF
@@ -127,12 +128,12 @@ lrcdis $Version (http://code.google.com/p/lrcdis)
 		显示本帮助信息并退出
 	-v
 		显示版本号并退出
-	备注：不加任何选项则以 $Conf_file 为配置文件初始化运行
+备注：不加任何选项则以 $Conf_file 为配置文件初始化运行
 EOF
 }
 
 PLAYER_USERS() {
-	#一个参数,播放器进程名,返回改进程可能对应的用户ID.
+	#一个参数,播放器进程名,返回该进程可能对应的用户ID.
 	id -u | tr -d "\n"
 	if [ "$1" = "mpd" ];then
 		echo -n ",0" #mpd以root运行算合法
@@ -143,8 +144,8 @@ PLAYER_USERS() {
 	fi
 }
 
-CHECK_PLAYER() {	#自动检查播放器类型的函数
-	
+CHECK_PLAYER() {
+	#自动检查播放器类型的函数
 	#没有参数，返回播放器类型
 	
 	local players i
@@ -165,12 +166,14 @@ CHECK_PLAYER() {	#自动检查播放器类型的函数
 }
 
 BAIDU_URI(){
+	#得到百度歌词文件的下载URL
 	# 1 argument: gb
 	local htm
 	htm="`wget "http://mp3.baidu.com/m?f=ms&tn=baidump3lyric&ct=150994944&lf=2&rn=10&word="$1"&lm=-1" -q -T 10 -O- 2>/dev/null`"
 	echo "$htm" | grep -F .lrc | cut -d' ' -f3 | cut '-d"' -f2 | head -n 1
 }
 SOGOU_URI(){
+	#得到搜狗歌词文件的下载URL
 	# 1 argument: gb
 	local htm a
 	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
@@ -180,8 +183,8 @@ SOGOU_URI(){
 	[ "$a" = "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
 }
 
-DOWNLRC(){	  #下载歌词的函数
-
+DOWNLRC(){
+	#下载歌词的函数
 	#参数一个，$1 (str)： 歌曲名字; 没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
 
 	local nm link full_link gb file
@@ -207,8 +210,8 @@ DOWNLRC(){	  #下载歌词的函数
 	done
 }
 
-GET_TITLE() {	   #获取当前播放的歌曲名字
-
+GET_TITLE() {
+	#获取当前播放的歌曲名字
 	#参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
 
 	local readname t a tmp flag ans sn
@@ -304,7 +307,6 @@ GET_TITLE() {	   #获取当前播放的歌曲名字
 }   
 
 GET_PLTM() {
-	
    #参数一个，$1，播放器类型；返回播放器播放歌曲的当前时间 (转换成秒)
    #GET_PLTM如果是空那么就表示已经停止或者播放器退出。
    
@@ -366,7 +368,6 @@ GET_PLTM() {
 }
 
 GET_LEN() {
-	
    #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
    # not used in the program since it's not done...  --oldherl
    
@@ -421,8 +422,8 @@ GET_LEN() {
 
 }
 
-DIS_WORDS() {		#以各种预设的模式显示文字
-
+DIS_WORDS() {
+	#以各种预设的模式显示文字
 	#两个参数; $1:T标题W普通歌词E错误信息  正确执行按照Dismode将 $2 格式化输出
 
 	local line i j nl
@@ -498,8 +499,8 @@ DIS_WORDS() {		#以各种预设的模式显示文字
 	fi
 }
 
-DISPLAY() {		 #显示歌词函数
-
+DISPLAY() {
+	#显示歌词函数
 	#参数两个，$1： 时间、$2： 字符串；正确执行将字符串格式化输出
 
 	local line tmp
@@ -518,7 +519,8 @@ DISPLAY() {		 #显示歌词函数
 	fi
 }
 
-GET_STAT() {	#获取播放器的当前状态
+GET_STAT() {
+	#获取播放器的当前状态
 
 	#没有参数，有两个独立的时间循环，一个用于产生时间信号（独立于播放器的时间信号，一定循环次数以后与播放器的时间相校准，
 	#这样减少了获取播放器时间的次数，减少 cpu 开支，但是在有拖动时可能反应有一点延迟）；另一个用于间隔一定时间后获取标题
@@ -553,7 +555,8 @@ GET_STAT() {	#获取播放器的当前状态
 
 #===========================主流程==============================
 
-HANDLE_PARAM() { 	#读取并处理命令行参数
+HANDLE_PARAM() {
+	#读取并处理命令行参数
 
 	#参数 $@ 从命令行传入。
 

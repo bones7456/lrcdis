@@ -234,14 +234,14 @@ GET_TITLE() {
 	;;
 	"mocp")
 		if [ "$readname" = "filename" ];then
-			mocp -i|grep -i "^File"|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'
+			DO_NAME "`mocp -i|grep -i "^File"`"
 		else
 			t="`mocp -i|grep "^SongTitle:"|sed "s/.*:\ //"`"
 			a="`mocp -i|grep "^Artist:"|sed "s/.*:\ //"`"
 			if [ "$t" -a "$a" ];then
 				echo "$a" - "$t"
 			else
-				mocp -i|grep -i "^File"|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'
+				DO_NAME "`mocp -i|grep -i "^File"`"
 			fi
 		fi
 	;;
@@ -271,7 +271,7 @@ GET_TITLE() {
 				echo "$t"
 			fi
 		else
-			dcop amarok player nowPlaying|sed "s/.*\///g"|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$0);print $0 }'
+			DO_NAME "`dcop amarok player nowPlaying`"
 		fi
 	;;
 	"exaile")

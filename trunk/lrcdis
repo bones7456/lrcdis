@@ -131,6 +131,18 @@ lrcdis $Version (http://code.google.com/p/lrcdis)
 EOF
 }
 
+PLAYER_USERS() {
+	#一个参数,播放器进程名,返回改进程可能对应的用户ID.
+	id -u | tr -d "\n"
+	if [ "$1" = "mpd" ];then
+		echo -n ",0" #mpd以root运行算合法
+		if id -u mpd >/dev/null 2>&1 ;then
+			echo -n ","
+			id -u mpd | tr -d "\n" #mpd以mpd用户运行算合法
+		fi
+	fi
+}
+
 CHECK_PLAYER() {	#自动检查播放器类型的函数
 	
 	#没有参数，返回播放器类型
@@ -139,12 +151,12 @@ CHECK_PLAYER() {	#自动检查播放器类型的函数
 
 	#所有被支持的播放器都保存下面的字符串里面
 	players="rhythmbox audacious amarok amarokapp exaile quodli quodlibet mocp mpd mplayer"
-	if pgrep -f "$Player" >/dev/null;then
+	if pgrep -fu `PLAYER_USERS "$Player"` "$Player" >/dev/null;then
 		echo -n "$Player"
 	else
 		for i in $players;do
 			[ "$Debug" = 1 ] && echo "$Player   $i" >&2
-			if pgrep -f "$i" >/dev/null ;then
+			if pgrep -fu `PLAYER_USERS "$i"` "$i" >/dev/null ;then
 				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
 				break
 			fi
@@ -519,7 +531,7 @@ GET_STAT() {	#获取播放器的当前状态
 
 	Sleeptm=${Sleeptm:-0.6}
 
-	while :;do			
+	while :;do
 		((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
 		((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
 		sleep $Sleeptm

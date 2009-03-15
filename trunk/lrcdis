@@ -213,7 +213,9 @@ DOWNLRC(){
 GET_TITLE() {
 	#获取当前播放的歌曲名字
 	#参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
-
+	#请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
+	#title和artist信息应该尽量同时获取(而不是使用两个命令分别获取)
+	#以免此时播放器进入下一首而造成错位 (A的标题和B的歌手名)，参见mocp, quodlibet的处理方法
 	local readname t a tmp flag ans sn
 
 	readname=${2:-id3}
@@ -233,15 +235,17 @@ GET_TITLE() {
 	[ "$Debug" = 1 ]&& echo "GET_TITLE: $ans" >&2
 	;;
 	"mocp")
+		tmp="`mocp -i`"
 		if [ "$readname" = "filename" ];then
-			DO_NAME "`mocp -i|grep -i "^File"`"
+			DO_NAME "`echo "$tmp" | grep "^File: " | cut -d\  -f2- `"
 		else
-			t="`mocp -i|grep "^SongTitle:"|sed "s/.*:\ //"`"
-			a="`mocp -i|grep "^Artist:"|sed "s/.*:\ //"`"
-			if [ "$t" -a "$a" ];then
-				echo "$a" - "$t"
+			t="`echo "$tmp" |grep "^SongTitle: "| cut -d\  -f2- `"
+			a="`echo "$tmp" |grep "^Artist: "| cut -d\  -f2- `"
+			if [ "$t" ];then
+				[ "$a" ] && echo -n "$a - "
+				echo "$t"
 			else
-				DO_NAME "`mocp -i|grep -i "^File"`"
+				DO_NAME "`echo "$tmp" | grep "^File: " | cut -d\  -f2- `"
 			fi
 		fi
 	;;
@@ -261,35 +265,37 @@ GET_TITLE() {
 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			t="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
-			|grep -FA1 'string "title"'|tail -n1|awk -F'"' '{print $2}'`"
-			a="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
-			|grep -FA1 'string "artist"'|tail -n1|awk -F'"' '{print $2}'`"
-			if [ "$t" -a "$a" ];then
-				echo "$a" - "$t"
-			else
+			tmp="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata`"
+			t="`echo "$tmp" |grep -FA1 'string "title"'|tail -n1|awk -F\" '{print $2}'`"
+			a="`echo "$tmp" |grep -FA1 'string "artist"'|tail -n1|awk -F\" '{print $2}'`"
+			if [ "$t" ];then
+				[ "$a" ] && echo -n "$a - "
 				echo "$t"
 			fi
+			#TODO amarok2不能读取文件名？
 		else
+			#TODO amarok1不能读取id3信息？
 			DO_NAME "`dcop amarok player nowPlaying`"
 		fi
 	;;
 	"exaile")
 		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title \
-			| sed -n '$p'|awk -F'"' '{print $2}'`"
+			| sed -n '$p'|awk -F\" '{print $2}'`"
 		tmp="`DO_NAME "$t"`"
 		if [ "$tmp" != "$t" ] ; then
 			echo "$tmp"
 		else
 			a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_artist \
-			| sed -n '$p'|awk -F'"' '{print $2}'`"
-			echo "$a" - "$t"
+			| sed -n '$p'|awk -F\" '{print $2}'`"
+			[ "$a" ] && echo -n "$a - "
+			echo "$t"
 		fi
 	;;
 	"quodlibet")
-		sn="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong`"
-		a="`echo "$sn" | grep -FA1 'string "artist' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
-		t="`echo "$sn" | grep -FA1 'string "title' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong`"
+		#下面的tab符是需要的，不能去掉
+		a="`echo "$tmp" | grep -FA1 '	string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		t="`echo "$tmp" | grep -FA1 '	string "title"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		echo "$a" - "$t"
 	;;
 	"rhythmbox")
@@ -300,7 +306,7 @@ GET_TITLE() {
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
 		echo "get_file_name">/dev/shm/mfifo
-		t="`cat "/dev/shm/ififo"|awk -F"'" '/^ANS_FILENAME/{gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$2);print $2}'`"
+		t="`cat "/dev/shm/ififo"|awk -F\' '/^ANS_FILENAME/{gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$2);print $2}'`"
 		[ "$t" ] && echo "$t"
 	;;
 	esac
@@ -309,6 +315,7 @@ GET_TITLE() {
 GET_PLTM() {
    #参数一个，$1，播放器类型；返回播放器播放歌曲的当前时间 (转换成秒)
    #GET_PLTM如果是空那么就表示已经停止或者播放器退出。
+   #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
 	local tm min sec tmptm
 
@@ -324,8 +331,12 @@ GET_PLTM() {
 		}
 	;;
 	"mocp")
-		tm="`mocp -i | grep "^CurrentSec: " | sed -e 's/CurrentSec:\ //'`"
-		[ "$tm" ] && echo $(($tm))
+		tm="`mocp -i | grep "^State: " | tail -c 2 `"
+		# Y means PLAY...
+		[ "$tm" = "Y" ] && {
+			tm="`mocp -i | grep "^CurrentSec: " | cut -d\  -f2- `"
+			[ "$tm" ] && echo $(($tm))
+		}
 	;;
 	"audacious")
 		tm="`audtool current-song-output-length-seconds`"
@@ -354,6 +365,7 @@ GET_PLTM() {
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"rhythmbox")
+		#TODO 替换成dbus-send    bones来做？ --oldherl
 		tm="`qdbus org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed`"
 		[ "$tm" ] && echo "$tm"
 	;;
@@ -370,6 +382,7 @@ GET_PLTM() {
 GET_LEN() {
    #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
    # not used in the program since it's not done...  --oldherl
+   #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
 	local tm min sec tmptm
 
@@ -609,7 +622,7 @@ case "$Dismode" in
 	sed -i "s/^Dismode=.*/Dismode=$Dismode/" "$Conf_file"
 	;;
 	*)
-	echo "无效的显示模式: $Dismode ,用默认的 echo 模式替代."
+	echo "无效的显示模式: $Dismode ,用默认的 echo 模式替代." >&2
 	;;
 esac
 Player="`CHECK_PLAYER`"
@@ -649,7 +662,9 @@ GET_STAT |while read line0;do
 	}
 
 	[ "$op" = "Time" ] && [ "$lrc" ] && {
-		arg="$(echo "${arg:-0}+$offset"|bc -l)";arg=${arg//.*/};arg=${arg:-0}
+		arg="${arg:-0}";
+		arg="`bc -l <<< "$arg+$offset" `"
+		arg=${arg//.*/};arg=${arg:-0}
 		arg="`printf '%.2d:%.2d\n' $(($arg/60)) $(($arg%60))`"
  		DISPLAY "$arg" "$lrc"
 	}

@@ -147,6 +147,19 @@ PLAYER_USERS() {
 	fi
 }
 
+PLAYER_RUNNING(){
+	#判断播放器进程是否存在
+
+	#一个参数, 播放器名
+	{
+	if [ "$1" = "quodlibet" ]; then
+		pgrep -fx "python `which quodlibet`" -u `PLAYER_USERS "$1"`
+	else
+		pgrep -x "$1" -u `PLAYER_USERS "$1"`
+	fi
+	} >/dev/null
+}
+
 CHECK_PLAYER() {
 	#自动检查播放器类型的函数
 
@@ -155,13 +168,13 @@ CHECK_PLAYER() {
 	local players i
 
 	#所有被支持的播放器都保存下面的字符串里面
-	players="rhythmbox audacious juk amarok amarokapp exaile quodli quodlibet mocp mpd mplayer"
-	if pgrep -xu `PLAYER_USERS "$Player"` "$Player" >/dev/null;then
+	players="rhythmbox audacious juk amarok amarokapp exaile quodlibet mocp mpd mplayer"
+	if PLAYER_RUNNING "$Player";then
 		echo -n "$Player"
 	else
 		for i in $players;do
 			[ "$Debug" = 1 ] && echo "$Player   $i" >&2
-			if pgrep -xu `PLAYER_USERS "$i"` "$i" >/dev/null ;then
+			if PLAYER_RUNNING "$i";then
 				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
 				break
 			fi

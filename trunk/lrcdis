@@ -365,8 +365,8 @@ GET_PLTM() {
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"rhythmbox")
-		#TODO 替换成dbus-send    bones来做？ --oldherl
-		tm="`qdbus org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed`"
+		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed | \
+		tail -n 1|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"mplayer")

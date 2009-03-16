@@ -23,7 +23,7 @@ INIT() {
 Lrcdir=~/.lyrics
 #显示模式： cli, osd, notify, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd, mocp, audacious, amarok, exaile, quodlibet, rhythmbox
+#播放器类型： mpd, mocp, audacious, juk, amarok, exaile, quodlibet, rhythmbox
 Player=rhythmbox
 #获取歌曲名称方式： id3 id3标签方式， filename 文件名方式
 Readname=id3
@@ -82,6 +82,7 @@ EOF
 
 DO_NAME() {
 	#  1 argument, the filename
+
 	#  removing .mp3/.wma/.ogg etc.
 	local a
 	a="`basename "$1"`"
@@ -93,6 +94,7 @@ DO_NAME() {
 
 USAGE() {
 	#显示帮助信息的函数
+
 	#没有参数，执行显示帮助信息
 
 	cat << EOF
@@ -133,6 +135,7 @@ EOF
 }
 
 PLAYER_USERS() {
+
 	#一个参数,播放器进程名,返回该进程可能对应的用户ID.
 	id -u | tr -d "\n"
 	if [ "$1" = "mpd" ];then
@@ -144,31 +147,22 @@ PLAYER_USERS() {
 	fi
 }
 
-PLAYER_RUNNING(){
-	{
-	if [ "$1" = "quodlibet" ]; then
-		pgrep -fx "python `which quodlibet`" -u `PLAYER_USERS "$1"`
-	else
-		pgrep -x "$1" -u `PLAYER_USERS "$1"`
-	fi
-	} >/dev/null
-}
-
 CHECK_PLAYER() {
 	#自动检查播放器类型的函数
+
 	#没有参数，返回播放器类型
 	
 	local players i
 
 	#所有被支持的播放器都保存下面的字符串里面
-	players="rhythmbox audacious amarok amarokapp exaile quodlibet mocp mpd mplayer"
-	if PLAYER_RUNNING "$Player";then
+	players="rhythmbox audacious juk amarok amarokapp exaile quodli quodlibet mocp mpd mplayer"
+	if pgrep -xu `PLAYER_USERS "$Player"` "$Player" >/dev/null;then
 		echo -n "$Player"
 	else
 		for i in $players;do
 			[ "$Debug" = 1 ] && echo "$Player   $i" >&2
-			if PLAYER_RUNNING "$i";then
-				echo -n "$i"|sed "s/amarokapp/amarok/"
+			if pgrep -xu `PLAYER_USERS "$i"` "$i" >/dev/null ;then
+				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
 				break
 			fi
 		done
@@ -177,6 +171,7 @@ CHECK_PLAYER() {
 
 BAIDU_URI(){
 	#得到百度歌词文件的下载URL
+
 	# 1 argument: gb
 	local htm
 	htm="`wget "http://mp3.baidu.com/m?f=ms&tn=baidump3lyric&ct=150994944&lf=2&rn=10&word="$1"&lm=-1" -q -T 10 -O- 2>/dev/null`"
@@ -184,6 +179,7 @@ BAIDU_URI(){
 }
 SOGOU_URI(){
 	#得到搜狗歌词文件的下载URL
+
 	# 1 argument: gb
 	local htm a
 	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
@@ -195,6 +191,7 @@ SOGOU_URI(){
 
 DOWNLRC(){
 	#下载歌词的函数
+
 	#参数一个，$1 (str)： 歌曲名字; 没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
 
 	local nm link full_link gb file
@@ -222,6 +219,7 @@ DOWNLRC(){
 
 GET_TITLE() {
 	#获取当前播放的歌曲名字
+
 	#参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
 	#请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
 	#title和artist信息应该尽量同时获取(而不是使用两个命令分别获取)
@@ -273,18 +271,42 @@ GET_TITLE() {
 			fi
 		fi
 	;;
+	"juk")
+		if [ "$readname" = "filename" ];then
+
+			#TODO (dont know how to get title & artist using dbus-send, use qdbus instead temporarily)
+			#f="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.playingString \
+			#|grep 'string'|awk -F\" '{print $2}'`"
+ 			f="`qdbus org.kde.juk /Player trackProperty Path`"
+ 			echo "`DO_NAME "$f"`"
+ 		else
+ 			t="`qdbus org.kde.juk /Player trackProperty Title`"
+ 			if [ "$t" ];then
+ 				echo "$t"
+ 			else
+ 				f="`qdbus org.kde.juk /Player trackProperty Path`"
+ 				echo "`DO_NAME "$f"`"
+ 			fi
+ 		fi
+ 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
 			tmp="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata`"
-			t="`echo "$tmp" |grep -FA1 'string "title"'|tail -n1|awk -F\" '{print $2}'`"
-			a="`echo "$tmp" |grep -FA1 'string "artist"'|tail -n1|awk -F\" '{print $2}'`"
-			if [ "$t" ];then
-				[ "$a" ] && echo -n "$a - "
-				echo "$t"
+			if [ "$readname" = "filename" ];then
+				f="`echo "$tmp" |grep 'string "file:'|perl -p -e 's/%(..)/pack("c", hex($1))/eg'|sed 's/^.*\///'`"
+				echo "`DO_NAME "$f"`"	
+			else
+				#下面的awk如果用-F\"则会出现：unexpected EOF while looking for matching `"' --xiooli
+				t="`echo "$tmp" |grep -FA1 'string "title"'|tail -n1|awk -F'"' '{print $2}'`"
+				a="`echo "$tmp" |grep -FA1 'string "artist"'|tail -n1|awk -F'"' '{print $2}'`"
+				if [ "$t" ];then
+					[ "$a" ] && echo -n "$a - "
+					echo "$t"
+				fi
 			fi
-			#TODO amarok2不能读取文件名？
 		else
 			#TODO amarok1不能读取id3信息？
+			#amarok1我没有，不能测试。--xiooli
 			DO_NAME "`dcop amarok player nowPlaying`"
 		fi
 	;;
@@ -324,6 +346,7 @@ GET_TITLE() {
 
 GET_PLTM() {
    #参数一个，$1，播放器类型；返回播放器播放歌曲的当前时间 (转换成秒)
+
    #GET_PLTM如果是空那么就表示已经停止或者播放器退出。
    #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
@@ -352,9 +375,15 @@ GET_PLTM() {
 		tm="`audtool current-song-output-length-seconds`"
 		[ "$tm" ] && echo "$tm"
 	;;
+	"juk")
+		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.currentTime \
+		|grep 'int32'|awk '{print $2}'`"
+		[ "$tm" ] && echo "$tm"
+	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet|grep int32|awk '{print $2}'`"
+			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet \
+			|grep int32|awk '{print $2}'`"
 			tm=$(($tm/1000))
 		else
 			tm="`dcop amarok player trackCurrentTime`"
@@ -363,20 +392,20 @@ GET_PLTM() {
 	;;
 	"exaile")
 		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query \
-		| tail -c 10 |awk -F[][] '{print $2}'`"
+		|tail -c 10 |awk -F[][] '{print $2}'`"
 		min=${tm//:*/}
 		tmptm=${tm//*:/}
 		sec=${tmptm/#0/}
 		[ "$tm" ] && echo $(($min*60+$sec))
 	;;
 	"quodlibet")
-		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition| \
-		sed -n '$p'|awk '{print $2}'`"
+		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition \
+		|sed -n '$p'|awk '{print $2}'`"
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"rhythmbox")
-		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed | \
-		tail -n 1|awk '{print $2}'`"
+		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed \
+		|tail -n 1|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"mplayer")
@@ -391,6 +420,7 @@ GET_PLTM() {
 
 GET_LEN() {
    #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
+
    # not used in the program since it's not done...  --oldherl
    #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
@@ -415,8 +445,14 @@ GET_LEN() {
 		tm="`audtool current-song-length-seconds`"
 		[ "$tm" ] && echo "$tm"
 	;;
+	"juk")
+		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.totalTime \
+		|grep 'int32'|awk '{print $2}'`"
+		[ "$tm" ] && echo "$tm"
+	;;
 	"amarok")
-		tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata|grep -FA1 'string "mtime"'|tail -n1|awk '{print $3}'`"
+		tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
+		|grep -FA1 'string "mtime"'|tail -n1|awk '{print $3}'`"
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"exaile")
@@ -428,8 +464,8 @@ GET_LEN() {
 		[ "$tm" ] && echo $(($min*60+$sec))
 	;;
 	"quodlibet")
-		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong| \
-		grep -FA1 string\ \"~#length\" | tail -n 1 | cut -d\" -f2 `"
+		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong \
+		|grep -FA1 string\ \"~#length\" | tail -n 1 | cut -d\" -f2 `"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"rhythmbox")
@@ -447,6 +483,7 @@ GET_LEN() {
 
 DIS_WORDS() {
 	#以各种预设的模式显示文字
+
 	#两个参数; $1:T标题W普通歌词E错误信息  正确执行按照Dismode将 $2 格式化输出
 
 	local line i j nl
@@ -524,6 +561,7 @@ DIS_WORDS() {
 
 DISPLAY() {
 	#显示歌词函数
+
 	#参数两个，$1： 时间、$2： 字符串；正确执行将字符串格式化输出
 
 	local line tmp
@@ -560,7 +598,7 @@ GET_STAT() {
 		((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
 		((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
 		sleep $Sleeptm
-		[ "$n0" = "1" ] && [ ! "`pgrep -f $Player`" ] && echo "Error 未发现被支持的播放器进程！" && exit
+		[ "$n0" = "1" ] && [ ! "`pgrep -x $Player`" ] && echo "Error 未发现被支持的播放器进程！" && exit
 		[ "$n0" = "1" ] && { 
 			pltm0="`GET_PLTM $Player`"
 			if [ "${pltm0:-0}" = "$pltm1" ] || [ "$pltm0" = "" ];then
@@ -575,8 +613,6 @@ GET_STAT() {
 		echo "Time $(echo "${pltm0:-0}+$Sleeptm*$n0"|bc -l)"
 	done
 }
-
-#===========================主流程==============================
 
 HANDLE_PARAM() {
 	#读取并处理命令行参数
@@ -624,6 +660,8 @@ HANDLE_PARAM() {
 	[ "$Dismode" = "fifo" ] && { [ -p /dev/shm/lrcfifo ] || mkfifo /dev/shm/lrcfifo; }
 
 }
+
+#===========================主流程==============================
 
 INIT
 HANDLE_PARAM $@
@@ -675,7 +713,7 @@ GET_STAT |while read line0;do
 		arg="${arg:-0}";
 		arg="`bc -l <<< "$arg+$offset" `"
 		arg=${arg//.*/};arg=${arg:-0}
-		arg="`printf '%.2d:%.2d\n' $(($arg/60)) $(($arg%60))`"
+		arg="`printf '%.2d:%.2d' $(($arg/60)) $(($arg%60))`"
  		DISPLAY "$arg" "$lrc"
 	}
 done

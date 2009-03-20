@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090315
+Version=svn-090320
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -345,7 +345,8 @@ GET_TITLE() {
 	;;
 	"rhythmbox")
 		t="`rhythmbox-client --print-playing --no-start|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
-		[ "$t" ] || exit
+		#播放器还未播放的时候会返回空,不应该exit
+		#[ "$t" ] || exit
 		echo "$t"
 	;;
 	"mplayer")

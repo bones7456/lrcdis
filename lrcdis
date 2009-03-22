@@ -643,10 +643,10 @@ HANDLE_PARAM() {
 				title="$OPTARG"
 				if [ "$title" ];then
 					DOWNLRC "$title"
-					if [ -f "$Save_dir/$title.lrc" ];then
-						echo "歌词文件 $Save_dir/$title.lrc 已保存。"
+					if [ -f "$Lrcdir/$title.lrc" ];then
+						echo "歌词文件 $Lrcdir/$title.lrc 已保存。"
 					else
-						echo "歌词文件下载失败：（"
+						echo "$title 的歌词文件下载失败：（"
 					fi
 				else
 					echo "未输入歌曲名！"

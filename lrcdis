@@ -344,7 +344,7 @@ GET_TITLE() {
 		echo "$a" - "$t"
 	;;
 	"rhythmbox")
-		t="`rhythmbox-client --print-playing --no-start|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
+		t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
 		#播放器还未播放的时候会返回空,不应该exit
 		#[ "$t" ] || exit
 		echo "$t"
@@ -418,7 +418,7 @@ GET_PLTM() {
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"rhythmbox")
-		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed \
+		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed 2>/dev/null \
 		|tail -n 1|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;

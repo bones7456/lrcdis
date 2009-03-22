@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090320
+Version=svn-090322
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -347,7 +347,9 @@ GET_TITLE() {
 		t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
 		#播放器还未播放的时候会返回空,不应该exit
 		#[ "$t" ] || exit
+		[ "$t" = "Not playing" ] && t=""
 		echo "$t"
+		[ "$Debug" = 1 ]&& echo "GET_TITLE: $t" >&2
 	;;
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
@@ -617,14 +619,24 @@ GET_STAT() {
 			pltm0="`GET_PLTM $Player`"
 			if [ "${pltm0:-0}" = "$pltm1" ] || [ "$pltm0" = "" ];then
 				echo "Error 播放器已停止或未开启！"
+				PlayerStat="Unknow"
 				sleep 3
 				continue
 			else
 				pltm1="$pltm0"
 			fi 
 		}
-		[ "$n1" = "1" ] && echo -n "Title " && GET_TITLE $Player $Readname
-		echo "Time $(echo "${pltm0:-0}+$Sleeptm*$n0"|bc -l)"
+		
+		[ "$n1" = "1" ] && {
+			title=`GET_TITLE $Player $Readname`
+			if [ "$title" ];then
+				echo "Title $title"
+				PlayerStat="Playing"
+			else
+				PlayerStat="Unknow"
+			fi
+		}
+		[ "$PlayerStat" = "Playing" ] && echo "Time $(echo "${pltm0:-0}+$Sleeptm*$n0"|bc -l)"
 	done
 }
 
@@ -697,6 +709,8 @@ else
 fi
 Title="`GET_TITLE $Player $Readname`"
 pltm="`GET_PLTM $Player`"
+#TODO 目前PlayerStat的值只有Unknow和Playing,以后可以考虑加入Pause等状态.
+PlayerStat="Unknow"
 
 GET_STAT |while read line0;do
 	[ "$Debug" = 1 ] && echo "GET_STAT: $line0<<" >&2

@@ -122,6 +122,8 @@ lrcdis $Version (http://code.google.com/p/lrcdis)
 		将歌词输出到管道文件/dev/shm/lrcfifo
 	-m title
 		将歌词输出到终端的标题中(支持大多数终端)
+	-m kdialog
+		将歌词以kdialog的通知模式输出
 	-m echo
 		将歌词以普通echo模式输出
 	-m cli

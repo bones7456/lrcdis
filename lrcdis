@@ -208,10 +208,13 @@ SOGOU_URI() {
 
 	#三个参数，$1：gbk编码的歌曲名的urlencode; $2：歌词页序数; $3 (int)：欲提取的下载的链接序数
 	#（用于第一个链接的歌词不对时从新下载下一个链接）
-	local htm a
-	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"&page="${2:-1}"" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
+
+	local a
+	Lrcurl0="http://mp3.sogou.com/gecisearch.so?query=${1}&page=${2:-1}"
+	[ "$Lrcurl" != "$Lrcurl0" ] && Lrcurl="$Lrcurl0" \
+	&& Htm="`wget "$Lrcurl"  -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
 	#[ "$Debug" = 1 ] && echo "HTM $htm" > /tmp/htm
-	a="`echo "$htm" | grep -Fim"${3:-1}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
+	a="`echo "$Htm" | grep -Fim"${3:-1}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
 	[ "$Debug" = 1 ] && echo "A $a" >&2
 	[ "$a" = "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
 }
@@ -235,14 +238,14 @@ DOWNLRC() {
 	#FIXME: just for a try
   	link="`SOGOU_URI "$gb" "$2" "$3"`"
 	[ "$Debug" = 1 ] && echo "Link: $link" >&2
-  	while [ "$link" ] && [ ! -s "$file" ];do
+  	[ "$link" ] && {
 		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
 		{ echo '<xml>'; cat "$file"; echo '</xml>';} > /tmp/lrcdisTMP.xml
 		xmllint /tmp/lrcdisTMP.xml --encode UTF-8 2>/dev/null > /tmp/lrcdisTMP.lrc && {
 			cat /tmp/lrcdisTMP.lrc | head -n -1 | tail -n +3 > "$file"
 		}
 		rm /tmp/lrcdisTMP* &>/dev/null
-	done
+	}
 }
 
 CHECK_LRC() {

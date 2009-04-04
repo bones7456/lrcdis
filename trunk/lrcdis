@@ -110,18 +110,18 @@ lrcdis $Version (http://code.google.com/p/lrcdis)
 用法： $0 [选项]
 选项：
 
-	-C <Config file name>
-		specify config file name (default: ~/.config/lrcdis.conf)
-	-s <Save directory>
-		specify directory to save lyrics (default: ~/.lyrics)
-	-d <歌曲名>
+	-C, --config <配置文件路径>
+		指定配置文件 (默认： ~/.config/lrcdis.conf)
+	-s, --save-dir <保存目录>
+		指定歌词的保存目录 (默认： ~/.lyrics)
+	-d, --download <歌曲名>
 		仅下载歌词, 保存至歌词目录
-	-E 
+	-E, --edit-conf
 		进入编辑配置文件的模式
-	-p <Player>
-		Try that player first. Will search for others if not present.
-	-m <Dismode>
-		Display in that mode. (See following)
+	-p, --player <播放器>
+		优先检查此播放器，如果此播放器未运行则继续检查其他播放器
+	-m, --mode <显示模式>
+		以 <显示模式> 显示歌词，详细参数见下面：
 	-m osd
 		以osd模式显示歌词(needs gnome-osd)
 	-m notify
@@ -136,11 +136,11 @@ lrcdis $Version (http://code.google.com/p/lrcdis)
 		将歌词以普通echo模式输出
 	-m cli
 		以cli模式显示歌词
-	-D
+	-D, --debug
 		Debug mode
-	-h
+	-h, --help
 		显示本帮助信息并退出
-	-v
+	-v, --version
 		显示版本号并退出
 备注：不加任何选项则以 $Conf_file 为配置文件初始化运行
 EOF
@@ -829,10 +829,9 @@ GET_STAT |while read line0;do
 			lrc=""
 			DIS_WORDS E "未能下载歌词"
 		fi
-	}
 		#处理 offset
 		offset="`echo $lrc|awk -F"offset:" '{gsub("].*$","",$2);print $2/1000}'`";offset=${offset:-0}
-
+	}
 	[ "$op" = "Time" ] && [ "$lrc" ] && {
 		arg="${arg:-0}";
 		arg="`bc -l <<< "$arg+$offset" `"

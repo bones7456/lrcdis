@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090402
+Version=svn-090404
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -57,7 +57,13 @@ Addnewline=off
 #notify模式的图标文件名(只支持绝对路径)
 NotifyIcon=""
 #kdialog显示的timeout
-Ktimeout="5"
+Ktimeout=5
+#====================[lrc]======================
+#是否检查歌词文件，yes/no，yes将会检查歌词文件是否
+#正确，若不正确则重新下载歌词
+Checklrc=yes
+#下载歌词的最大重试次数
+Maxdowntimes=10
 #================================================
 #定义颜色（仅在cli模式下使用）
 black="38;5;0m"
@@ -110,6 +116,8 @@ lrcdis $Version (http://code.google.com/p/lrcdis)
 		specify directory to save lyrics (default: ~/.lyrics)
 	-d <歌曲名>
 		仅下载歌词, 保存至歌词目录
+	-E 
+		进入编辑配置文件的模式
 	-p <Player>
 		Try that player first. Will search for others if not present.
 	-m <Dismode>
@@ -186,7 +194,7 @@ CHECK_PLAYER() {
 	fi
 }
 
-BAIDU_URI(){
+BAIDU_URI() {
 	#得到百度歌词文件的下载URL
 
 	# 1 argument: gb
@@ -194,22 +202,25 @@ BAIDU_URI(){
 	htm="`wget "http://mp3.baidu.com/m?f=ms&tn=baidump3lyric&ct=150994944&lf=2&rn=10&word="$1"&lm=-1" -q -T 10 -O- 2>/dev/null`"
 	echo "$htm" | grep -F .lrc | cut -d' ' -f3 | cut '-d"' -f2 | head -n 1
 }
-SOGOU_URI(){
+
+SOGOU_URI() {
 	#得到搜狗歌词文件的下载URL
 
-	# 1 argument: gb
+	#三个参数，$1：gbk编码的歌曲名的urlencode; $2：歌词页序数; $3 (int)：欲提取的下载的链接序数
+	#（用于第一个链接的歌词不对时从新下载下一个链接）
 	local htm a
-	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
+	htm="`wget "http://mp3.sogou.com/gecisearch.so?query="$1"&page="${2:-1}"" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
 	#[ "$Debug" = 1 ] && echo "HTM $htm" > /tmp/htm
-	a="`echo "$htm" | grep -Fim1 "downlrc"|awk -F\\\" '{print $2}'`"
+	a="`echo "$htm" | grep -Fim"${3:-1}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
 	[ "$Debug" = 1 ] && echo "A $a" >&2
 	[ "$a" = "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
 }
 
-DOWNLRC(){
+DOWNLRC() {
 	#下载歌词的函数
 
-	#参数一个，$1 (str)： 歌曲名字; 没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
+	#参数两个，$1 (str)： 歌曲名字; $2：歌词页序数; $3 (int)：欲提取的下载的链接序数
+	#没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
 
 	local nm link full_link gb file
 
@@ -222,7 +233,7 @@ DOWNLRC(){
 
 	#从baidu搜索里面找出当前歌曲的歌词下载页
 	#FIXME: just for a try
-  	link="`SOGOU_URI "$gb"`"
+  	link="`SOGOU_URI "$gb" "$2" "$3"`"
 	[ "$Debug" = 1 ] && echo "Link: $link" >&2
   	while [ "$link" ] && [ ! -s "$file" ];do
 		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
@@ -232,6 +243,56 @@ DOWNLRC(){
 		}
 		rm /tmp/lrcdisTMP* &>/dev/null
 	done
+}
+
+CHECK_LRC() {
+	#检查歌词文件是否正确
+	
+	#参数三个，$1： 歌词文件路径; $2： 当前歌曲的标题（包含题目和/或艺人）
+	# $3：检查是否放水（yes严格执行，no则总返回合格）
+	#正确返回字符串LRC-RIGHT，反之LRC-WRONG
+	
+	local ti0 ti1 ar0 ar1 judge
+	if [ "${3:-yes}" = "yes" ];then
+		ti0="`cat "$1"|grep -o "\[ti:.*\]"|tr -d "[]"`";ti0="${ti0/ti:}"
+		ar0="`cat "$1"|grep -o "\[ar:.*\]"|tr -d "[]"`";ar0="${ar0/ar:}"
+		ti1="${2//*-\ }"
+		[ "${ar1//-}" = "$ar1" ] || ar1="${2//\ -*}"
+		if [ ! "$ar1" ]; then
+			if [ "$ti0" = "$ti1" ]; then
+			       judge="LRC-RIGHT"
+			else
+			       judge="LRC-WRONG"
+			fi
+		else
+			if [ "$ti0" = "$ti1" -a "$ar0" = "$ar1" ]; then
+				judge="LRC-RIGHT"
+			else	
+				judge="LRC-WRONG"
+			fi
+		fi
+	else
+		judge="LRC-RIGHT"
+	fi
+	echo "$judge"
+	[ "$Debug" = 1 ] && echo "CHECK_LRC: $judge; Checklrc => $3; File => $ar0 - $ti0; Title => $2" >&2
+}
+
+CHECK_AND_DOWN_LRC() {
+	#检查有无歌词文件和是否正确，无则下载，不正确则重新下载
+	
+	#两个参数，$1：歌曲名字; $2：是否执行歌词检查（yes执行，no不执行）
+
+	local lrcnm page downtimes
+	lrcnm=1;page=1;downtimes=0
+	[ -f "$Lrcdir/$1.lrc" ] || DOWNLRC "$1"
+    	while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-10}" ]; do
+    		DOWNLRC "$1" "$page" "$lrcnm"
+	       	((lrcnm++))
+	       	((downtimes++))
+	       	[ "$lrcnm" -gt 5 ] && ((page++)) && lrcnm=1
+		[ "$Debug" = 1 ] && echo "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Page => $page; Lrcnm => $lrcnm"
+    done
 }
 
 GET_TITLE() {
@@ -277,14 +338,14 @@ GET_TITLE() {
 	"audacious")
 		if [ "$readname" = "filename" ];then
 			f="`audtool current-song-filename`"
-			echo "`DO_NAME "$f"`"
+			DO_NAME "$f"
 		else
 			t="`audtool current-song`"
 			if [ "$t" ];then
 				echo "$t"
 			else
 				f="`audtool current-song-filename`"
-				echo "`DO_NAME "$f"`"
+				DO_NAME "$f"
 			fi
 		fi
 	;;
@@ -295,14 +356,14 @@ GET_TITLE() {
 			#f="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.playingString \
 			#|grep 'string'|awk -F\" '{print $2}'`"
  			f="`qdbus org.kde.juk /Player trackProperty Path`"
- 			echo "`DO_NAME "$f"`"
+ 			DO_NAME "$f"
  		else
  			t="`qdbus org.kde.juk /Player trackProperty Title`"
  			if [ "$t" ];then
  				echo "$t"
  			else
  				f="`qdbus org.kde.juk /Player trackProperty Path`"
- 				echo "`DO_NAME "$f"`"
+ 				DO_NAME "$f"
  			fi
  		fi
  	;;
@@ -311,7 +372,7 @@ GET_TITLE() {
 			tmp="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata`"
 			if [ "$readname" = "filename" ];then
 				f="`echo "$tmp" |grep 'string "file:'|perl -p -e 's/%(..)/pack("c", hex($1))/eg'|sed 's/^.*\///'`"
-				echo "`DO_NAME "$f"`"	
+				DO_NAME "$f"	
 			else
 				#下面的awk如果用-F\"则会出现：unexpected EOF while looking for matching `"' --xiooli
 				t="`echo "$tmp" |grep -FA1 'string "title"'|tail -n1|awk -F'"' '{print $2}'`"
@@ -323,8 +384,17 @@ GET_TITLE() {
 			fi
 		else
 			#TODO amarok1不能读取id3信息？
-			#amarok1我没有，不能测试。--xiooli
-			DO_NAME "`dcop amarok player nowPlaying`"
+			#amarok1我没有，不能测试，下面的代码未经过测试，谁有amarok1的请测试下。--xiooli
+			if [ "$readname" = "filename" ];then
+				DO_NAME "`dcop amarok player nowPlaying 2>/dev/null`"
+			else
+				t="`dcop amarok player title 2>/dev/null`"
+				a="`dcop amarok player artist 2>/dev/null`"
+				if [ "$t" ];then
+					[ "$a" ] && echo -n "$a - "
+					echo "$t"
+				fi
+			fi
 		fi
 	;;
 	"exaile")
@@ -348,11 +418,13 @@ GET_TITLE() {
 		echo "$a" - "$t"
 	;;
 	"rhythmbox")
-		t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
+		#t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
+		#此处需要测试 --xiooli
+		t="`rhythmbox-client --no-start --print-playing-format %tt 2>/dev/null`"
 		#播放器还未播放的时候会返回空,不应该exit
 		#[ "$t" ] || exit
 		[ "$t" = "Not playing" ] && t=""
-		echo "$t"
+		DO_NAME "$t"
 		[ "$Debug" = 1 ]&& echo "GET_TITLE: $t" >&2
 	;;
 	"mplayer")
@@ -441,6 +513,8 @@ GET_PLTM() {
 GET_LEN() {
    #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
 
+   #这个东西是用来干什么的？如果用来判断歌词合不合法的话直接对比歌词文件里面的ar和ti就好阿，
+   #因为歌词里面并没有总时间的。--xiooli
    # not used in the program since it's not done...  --oldherl
    #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
@@ -471,9 +545,15 @@ GET_LEN() {
 		[ "$tm" ] && echo "$tm"
 	;;
 	"amarok")
-		tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
-		|grep -FA1 'string "mtime"'|tail -n1|awk '{print $3}'`"
-		[ "$tm" ] && echo $(($tm/1000))
+		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
+			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
+			|grep -FA1 'string "mtime"'|tail -n1|awk '{print $3}'`"
+			[ "$tm" ] && echo $(($tm/1000))
+		else
+			#下面amarok1的总时间代码未经测试 --xiooli
+			tm="`dcop amarok player totalTime 2>/dev/null`"
+			[ "$tm" ] && echo $(($tm/1000))
+		fi
 	;;
 	"exaile")
 		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_length \
@@ -489,7 +569,9 @@ GET_LEN() {
 		[ "$tm" ] && echo "$tm"
 	;;
 	"rhythmbox")
-		#TODO
+		#下面代码未经测试，骨头有rhythmbox测试下吧：），主要是看时间是否是秒。 --xiooli
+		tm="`rhythmbox-client --no-start --print-playing-format %td 2>/dev/null`"
+		[ "$tm" ] && echo "$tm"
 	;;
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
@@ -575,7 +657,7 @@ DIS_WORDS() {
 	elif [ "$Dismode" = "kdialog" ];then
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
-		kdialog --passivepopup "$line" "${Ktimeout:-5}" 2>/dev/null
+		kdialog --passivepopup "$line" "${Ktimeout:-5}" &>/dev/null
 
 	else
 		[ "$1" = T ] && line="****** $line ******"
@@ -654,8 +736,8 @@ HANDLE_PARAM() {
 
 	#参数 $@ 从命令行传入。
 
-	local param arg title
-	while getopts hvC:d:s:p:m:onfcteD param ; do
+	local param arg title conf_file editor
+	while getopts hvC:d:s:p:m:onfkcteDE param ; do
 		case "$param" in
 			h|--help)USAGE;exit 0;;
 			v|--version)echo $0" Version:"$Version;exit 0;;
@@ -673,6 +755,14 @@ HANDLE_PARAM() {
 					echo "未输入歌曲名！"
 				fi
 				exit 0;;
+			E|--edit-conf) 
+				echo "输入欲编辑的配置文件，回车编辑默认文件：$Conf_file"
+				read -p "请输入：" conf_file
+				echo "输入编辑器，默认 vim"
+				read -p "请输入：" editor
+				eval "${editor:-vim} \"${conf_file:-$Conf_file}\""
+				exit 0
+			;;
 			s|--save-dir) Lrcdir="$OPTARG";;
 			p|--player) Player="$OPTARG";;
 			m|--mode) Dismode="$OPTARG";;
@@ -686,8 +776,8 @@ HANDLE_PARAM() {
 			D|--debug) Debug=1;;
 			#-*)gettext "No such option: ">&2; echo "$param"; exit 1;;
 			"")
-			  gettext "Parameter not used: " 1>&2
-			  echo "$arg" 1>&2
+			  	gettext "Parameter not used: " 1>&2
+			  	echo "$arg" 1>&2
 			  ;;
 		  esac
 	done
@@ -732,20 +822,16 @@ GET_STAT |while read line0;do
 		title="$arg"
 		Title="$arg"
 		DIS_WORDS T "$Title";
-		if [ -f "$Lrcdir/$Title.lrc" ] ;then
+		CHECK_AND_DOWN_LRC "$Title" "$Checklrc"
+		if [ -f "$Lrcdir/$Title.lrc" ]; then
 			lrc="$(< "$Lrcdir/$Title.lrc")"
 		else
-			DOWNLRC "$Title"
-			if [ -f "$Lrcdir/$Title.lrc" ] ;then
-				lrc="$(< "$Lrcdir/$Title.lrc")"
-			else
-				lrc=""
-				DIS_WORDS E "未能下载歌词"
-			fi
+			lrc=""
+			DIS_WORDS E "未能下载歌词"
 		fi
+	}
 		#处理 offset
 		offset="`echo $lrc|awk -F"offset:" '{gsub("].*$","",$2);print $2/1000}'`";offset=${offset:-0}
-	}
 
 	[ "$op" = "Time" ] && [ "$lrc" ] && {
 		arg="${arg:-0}";

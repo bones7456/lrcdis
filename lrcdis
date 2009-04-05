@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090404
+Version=svn-090405
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -23,7 +23,7 @@ INIT() {
 Lrcdir=~/.lyrics
 #显示模式： cli, osd, notify, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd, mocp, audacious, juk, amarok, exaile, quodlibet, rhythmbox
+#播放器类型： mpd, mocp, audacious, juk, amarok, exaile, gmusicbrowser, quodlibet, rhythmbox
 Player=rhythmbox
 #获取歌曲名称方式： id3 id3标签方式， filename 文件名方式
 Readname=id3
@@ -180,7 +180,8 @@ CHECK_PLAYER() {
 	local players i
 
 	#所有被支持的播放器都保存下面的字符串里面
-	players="rhythmbox audacious juk amarok amarokapp exaile quodlibet mocp mpd mplayer"
+	#gmusicbrowser需要perl-net-dbus让其支持dbus通信才可以
+	players="rhythmbox audacious juk amarok amarokapp exaile gmusicbrowser quodlibet mocp mpd mplayer"
 	if PLAYER_RUNNING "$Player";then
 		echo -n "$Player"
 	else
@@ -413,12 +414,21 @@ GET_TITLE() {
 			echo "$t"
 		fi
 	;;
+	"gmusicbrowser")
+		tmp="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.CurrentSong`"
+		a="`echo "$tmp" | grep -FA1 'string "artist"'| tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		t="`echo "$tmp" | grep -FA1 'string "title"'| tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		[ "$a" ] && echo -n "$a - "
+		echo "$t"
+	;;
 	"quodlibet")
 		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong`"
 		#下面的tab符是需要的，不能去掉
 		a="`echo "$tmp" | grep -FA1 '	string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		t="`echo "$tmp" | grep -FA1 '	string "title"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
-		echo "$a" - "$t"
+		[ "$a" ] && echo -n "$a - "
+		echo "$t"
+
 	;;
 	"rhythmbox")
 		#t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
@@ -493,6 +503,11 @@ GET_PLTM() {
 		sec=${tmptm/#0/}
 		[ "$tm" ] && echo $(($min*60+$sec))
 	;;
+	"gmusicbrowser")
+		tm="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.GetPosition \
+		|grep double|awk '{print $2}'`"
+		[ "$tm" ] && echo "$tm"
+	;;
 	"quodlibet")
 		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition \
 		|sed -n '$p'|awk '{print $2}'`"
@@ -565,6 +580,11 @@ GET_LEN() {
 		tmptm=${tm//*:/}
 		sec=${tmptm/#0/}
 		[ "$tm" ] && echo $(($min*60+$sec))
+	;;
+	"gmusicbrowser")
+		tm="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.CurrentSong \
+		|grep -FA1 'string "length"'| tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		[ "$tm" ] && echo "$tm"
 	;;
 	"quodlibet")
 		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong \

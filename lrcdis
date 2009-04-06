@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090405
+Version=svn-090406
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -59,6 +59,8 @@ NotifyIcon=""
 #kdialog显示的timeout
 Ktimeout=5
 #====================[lrc]======================
+#从何处下载歌词: SOGOU_URI,BAIDU_URI
+Uri=SOGOU_URI
 #是否检查歌词文件，yes/no，yes将会检查歌词文件是否
 #正确，若不正确则重新下载歌词
 Checklrc=yes
@@ -198,32 +200,44 @@ CHECK_PLAYER() {
 BAIDU_URI() {
 	#得到百度歌词文件的下载URL
 
-	# 1 argument: gb
-	local htm
-	htm="`wget "http://mp3.baidu.com/m?f=ms&tn=baidump3lyric&ct=150994944&lf=2&rn=10&word="$1"&lm=-1" -q -T 10 -O- 2>/dev/null`"
-	echo "$htm" | grep -F .lrc | cut -d' ' -f3 | cut '-d"' -f2 | head -n 1
+	#两个参数，$1：gbk编码的歌曲名的urlencode; $2：提取的下载的链接序数
+	local nm page items urlstmp
+	page="$((${2:-1}/10))"
+	items="${#Urls[@]}";[ "$items" = "0" ] && items="1"
+	Lrcurl0="http://www.baidu.com/s?&wd=${1}+filetype%3Alrc&pn=${page}"
+	[ "$Lrcurl" != "$Lrcurl0" ] && Lrcurl="$Lrcurl0" \
+	&& Htm="`wget "$Lrcurl"  -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
+	if [ ! "${Urls[@]}" ] || [ "$2" -gt "$items" ]; then
+	       ((page++))
+	       Urls=($(echo $Htm|grep -o "http[^<>]*\.lrc"))
+       	fi
+	[ "$Debug" = 1 ] && echo "BAIDU_URI $Lrcurl0 ${Urls[@]}" >&2
+	nm="$((${2:-1}%$items))";((nm--));[ "$nm" -lt 0 ] && nm=0
+	[ "${Urls[$nm]}" = "" ] || echo -n "${Urls[$nm]}"
 }
 
 SOGOU_URI() {
 	#得到搜狗歌词文件的下载URL
 
-	#三个参数，$1：gbk编码的歌曲名的urlencode; $2：歌词页序数; $3 (int)：欲提取的下载的链接序数
-	#（用于第一个链接的歌词不对时从新下载下一个链接）
+	#两个参数，$1：gbk编码的歌曲名的urlencode; $2：提取的下载的链接序数
+	#（用于第一个链接的歌词不对时重新下载下一个链接）
 
-	local a
-	Lrcurl0="http://mp3.sogou.com/gecisearch.so?query=${1}&page=${2:-1}"
+	local a page nm
+	page="$((${2:-1}/5))"
+	nm="$((${2:-1}%5))"
+	Lrcurl0="http://mp3.sogou.com/gecisearch.so?query=${1}&page=${page}"
 	[ "$Lrcurl" != "$Lrcurl0" ] && Lrcurl="$Lrcurl0" \
 	&& Htm="`wget "$Lrcurl"  -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
 	#[ "$Debug" = 1 ] && echo "HTM $htm" > /tmp/htm
-	a="`echo "$Htm" | grep -Fim"${3:-1}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
-	[ "$Debug" = 1 ] && echo "A $a" >&2
-	[ "$a" = "" ]|| echo -n 'http://mp3.sogou.com/'"$a"
+	a="`echo "$Htm" | grep -Fim"${nm}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
+	[ "$Debug" = 1 ] && echo "A $Lrcurl0 $a" >&2
+	[ "$a" = "" ] || echo -n 'http://mp3.sogou.com/'"$a"
 }
 
 DOWNLRC() {
 	#下载歌词的函数
 
-	#参数两个，$1 (str)： 歌曲名字; $2：歌词页序数; $3 (int)：欲提取的下载的链接序数
+	#参数两个，$1 (str)： 歌曲名字; $2 (int)：欲提取的下载的链接序数
 	#没有返回值，正确执行会下载一个 lrc 文件至 Lrcdir
 
 	local nm link full_link gb file
@@ -235,9 +249,8 @@ DOWNLRC() {
 	#将歌曲名字转换为urlencode，utf-8的locale必须先转换为gbk的编码
   	gb="$(echo -n "$nm" | iconv -c -t gbk | od -t x1 -A n -w1000|tr " " "%")"
 
-	#从baidu搜索里面找出当前歌曲的歌词下载页
-	#FIXME: just for a try
-  	link="`SOGOU_URI "$gb" "$2" "$3"`"
+	#从歌词搜索里面找出当前歌曲的歌词下载页，默认从搜狗下
+  	link="`eval "\${Uri:-SOGOU_URI} \"\$gb\" \"\$2\""`"
 	[ "$Debug" = 1 ] && echo "Link: $link" >&2
   	[ "$link" ] && {
 		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
@@ -258,18 +271,20 @@ CHECK_LRC() {
 	
 	local ti0 ti1 ar0 ar1 judge
 	if [ "${3:-yes}" = "yes" ];then
-		ti0="`cat "$1"|grep -o "\[ti:.*\]"|tr -d "[]"`";ti0="${ti0/ti:}"
-		ar0="`cat "$1"|grep -o "\[ar:.*\]"|tr -d "[]"`";ar0="${ar0/ar:}"
-		ti1="${2//*-\ }"
-		[ "${ar1//-}" = "$ar1" ] || ar1="${2//\ -*}"
+		ti0="`cat "$1"|grep -o "\[ti:[^\[]*\]"|tr -d "[]"`";ti0="${ti0/ti:}"
+		ar0="`cat "$1"|grep -o "\[ar:[^\[]*\]"|tr -d "[]"`";ar0="${ar0/ar:}"
+		ti1="${2//*-}";ti1="`echo $ti1|sed 's/^\ \+//;s/\ \+$//'`"
+		[ "${2//-}" = "$2" ] || ar1="${2//-*}" && ar1="`echo $ar1|sed 's/^\ \+//;s/\ \+$//'`"
 		if [ ! "$ar1" ]; then
-			if [ "$ti0" = "$ti1" ]; then
+			if [ "$ti0" = "$ti1" -o "$ar0" = "$ti1"  ]; then
 			       judge="LRC-RIGHT"
 			else
 			       judge="LRC-WRONG"
 			fi
 		else
 			if [ "$ti0" = "$ti1" -a "$ar0" = "$ar1" ]; then
+				judge="LRC-RIGHT"
+			elif [ "$ti0" = "$ar1" -a "$ar0" = "$ti1" ]; then
 				judge="LRC-RIGHT"
 			else	
 				judge="LRC-WRONG"
@@ -279,7 +294,7 @@ CHECK_LRC() {
 		judge="LRC-RIGHT"
 	fi
 	echo "$judge"
-	[ "$Debug" = 1 ] && echo "CHECK_LRC: $judge; Checklrc => $3; File => $ar0 - $ti0; Title => $2" >&2
+	[ "$Debug" = 1 ] && echo "CHECK_LRC: $judge; Checklrc => $3; File =>Ar:$ar0, Ti:$ti0; Title => Ar:$ar1, Ti:$ti1" >&2
 }
 
 CHECK_AND_DOWN_LRC() {
@@ -287,15 +302,14 @@ CHECK_AND_DOWN_LRC() {
 	
 	#两个参数，$1：歌曲名字; $2：是否执行歌词检查（yes执行，no不执行）
 
-	local lrcnm page downtimes
-	lrcnm=1;page=1;downtimes=0
+	local lrcnm downtimes
+	lrcnm=1;downtimes=0
 	[ -f "$Lrcdir/$1.lrc" ] || DOWNLRC "$1"
     	while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-10}" ]; do
-    		DOWNLRC "$1" "$page" "$lrcnm"
+    		DOWNLRC "$1" "$lrcnm"
 	       	((lrcnm++))
 	       	((downtimes++))
-	       	[ "$lrcnm" -gt 5 ] && ((page++)) && lrcnm=1
-		[ "$Debug" = 1 ] && echo "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Page => $page; Lrcnm => $lrcnm"
+		[ "$Debug" = 1 ] && echo "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
     done
 }
 

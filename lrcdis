@@ -470,6 +470,10 @@ GET_PLTM() {
    #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
 	local tm min sec tmptm
+    if [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
+        echo "write to fifo"
+        echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
+    fi
 
 	case "${1:-rhythmbox}" in
 	"mpd")
@@ -850,6 +854,7 @@ pltm="`GET_PLTM $Player`"
 PlayerStat="Unknow"
 
 GET_STAT |while read line0;do
+    echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
 	[ "$Debug" = 1 ] && echo "GET_STAT: $line0<<" >&2
 	[ "$line0" = "$line1" ] && continue
 	line1="$line0"

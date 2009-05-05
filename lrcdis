@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090406
+Version=svn-090505
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -59,7 +59,7 @@ NotifyIcon=""
 #kdialog显示的timeout
 Ktimeout=5
 #====================[lrc]======================
-#从何处下载歌词: SOGOU_URI,BAIDU_URI
+#从何处下载歌词: SOGOU_URI,BAIDU_URI,QIANQIAN_URI
 Uri=SOGOU_URI
 #是否检查歌词文件，yes/no，yes将会检查歌词文件是否
 #正确，若不正确则重新下载歌词
@@ -234,6 +234,39 @@ SOGOU_URI() {
 	[ "$a" = "" ] || echo -n 'http://mp3.sogou.com/'"$a"
 }
 
+QIANQIAN_URI(){
+    #得到千千歌词文件的下载URL
+	local htm
+	[ "$Debug" = 1 ] && echo "gb: $1 | Title: $2" >&2
+	htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=1&pageflag=1&qword="$1"" -q -T 10 -O- 2>/dev/null`"
+	a="http://www.qianqian.com/""`echo "$htm" | grep -Fim1 lrcresult_frame | awk -F\\\" '{print $6}'`"
+	[ "$Debug" = 1 ] && echo "A $a" >&2
+	b="`wget "$a" --referer=www.qianqian.com -O- -q | grep -Fim1 downfromlrc | awk -F\\\" '{print $6}'`"
+	[ "$Debug" = 1 ] && echo "B $b" >&2
+	if [ "$b" != "" ]; then
+		echo -n 'http://www.qianqian.com/'"$b";
+	else
+		htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=3&pageflag=1&qword="$1"" -q -T 10 -O- 2>/dev/null`"
+		a="http://www.qianqian.com/""`echo "$htm" | grep -Fim1 lrcresult_frame | awk -F\\\" '{print $6}'`"
+		[ "$Debug" = 1 ] && echo "A $a" >&2
+		b="`wget "$a" --referer=www.qianqian.com -O- -q | grep -Fim1 downfromlrc | awk -F\\\" '{print $6}'`"
+		[ "$Debug" = 1 ] && echo "B $b" >&2
+		if [ "$b" != "" ]; then
+			echo -n 'http://www.qianqian.com/'"$b";
+		else
+			htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=3&pageflag=1&qword="$2"" -q -T 10 -O- 2>/dev/null`"
+			a="http://www.qianqian.com/""`echo "$htm" | grep -Fim1 lrcresult_frame | awk -F\\\" '{print $6}'`"
+			[ "$Debug" = 1 ] && echo "A $a" >&2
+			b="`wget "$a" --referer=www.qianqian.com -O- -q | grep -Fim1 downfromlrc | awk -F\\\" '{print $6}'`"
+			[ "$Debug" = 1 ] && echo "B $b" >&2
+			if [ "$b" != "" ]; then
+				echo -n 'http://www.qianqian.com/'"$b";
+			fi
+		fi
+	fi
+#	referer="www.qianqian.com"
+}
+
 DOWNLRC() {
 	#下载歌词的函数
 
@@ -252,8 +285,13 @@ DOWNLRC() {
 	#从歌词搜索里面找出当前歌曲的歌词下载页，默认从搜狗下
   	link="`eval "\${Uri:-SOGOU_URI} \"\$gb\" \"\$2\""`"
 	[ "$Debug" = 1 ] && echo "Link: $link" >&2
-  	[ "$link" ] && {
-		wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
+	[ "$link" ] && {
+		if [ "$Uri" = "QIANQIAN_URI" ];then 
+			#千千的需要referer,且不需要转码.
+  	    	wget "$link" --referer=www.qianqian.com -T 5 -t 2 -q -O - | tr -d "\r" > "$file"
+  	    else
+			wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
+		fi
 		{ echo '<xml>'; cat "$file"; echo '</xml>';} > /tmp/lrcdisTMP.xml
 		xmllint /tmp/lrcdisTMP.xml --encode UTF-8 2>/dev/null > /tmp/lrcdisTMP.lrc && {
 			cat /tmp/lrcdisTMP.lrc | head -n -1 | tail -n +3 > "$file"

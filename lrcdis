@@ -91,7 +91,7 @@ EOF
 }
 
 DEBUGECHO() {
-    [ "$Debug" = 1 ] && echo "$@" >&2
+    [ "$Debug" = 1 ] && echo "  $@" >&2
 }
 
 DO_NAME() {
@@ -828,7 +828,7 @@ HANDLE_PARAM() {
 			d|--download)
 				title="$OPTARG"
 				if [ "$title" ];then
-					DOWNLRC "$title"
+					CHECK_AND_DOWN_LRC "$title" "$Checklrc"
 					if [ -f "$Lrcdir/$title.lrc" ];then
 						echo "歌词文件 $Lrcdir/$title.lrc 已保存。"
 					else

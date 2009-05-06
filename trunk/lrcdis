@@ -21,11 +21,11 @@ INIT() {
 #===================LRCDIS-CONFIG================
 #保存lrc文件的文件夹
 Lrcdir=~/.lyrics
-#显示模式： cli, osd, notify, fifo (将歌词输出到一个管道文件，以便用其他命令访问)
+#显示模式： osd|notify|fifo|title|cli|kdialog|echo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd, mocp, audacious, juk, amarok, exaile, gmusicbrowser, quodlibet, rhythmbox
+#播放器类型： mpd|mocp|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|rhythmbox
 Player=rhythmbox
-#获取歌曲名称方式： id3 id3标签方式， filename 文件名方式
+#获取歌曲名称方式： id3(id3标签方式)|filename(文件名方式)
 Readname=id3
 #自身时间发生器产生时间的间隔（最好小于1秒）
 Sleeptm=0.6
@@ -47,12 +47,12 @@ Halignment=center
 Timeout=10000
 #span size
 Size=20000
-#字体颜色： green, white, blue, yellow, grey...
+#字体颜色： green|white|blue|yellow|grey|...
 #注意，这个颜色与cli模式的颜色不是一回事
 Foreground=green
 #动画效果： off, on
 Animations=off
-#是否加新行，以免挡住panel等: off, on
+#是否加新行，以免挡住panel等: off|on
 Addnewline=off
 #notify模式的图标文件名(只支持绝对路径)
 NotifyIcon=""
@@ -88,6 +88,10 @@ EOF
 	# how about save color codes into another file named "lrcdis.colors"
 	#sorry for not typing Chinese because of editor's bug   --oldherl
 	. "$Conf_file"
+}
+
+DEBUGECHO() {
+    [ "$Debug" = 1 ] && echo "$@" >&2
 }
 
 DO_NAME() {
@@ -188,7 +192,7 @@ CHECK_PLAYER() {
 		echo -n "$Player"
 	else
 		for i in $players;do
-			[ "$Debug" = 1 ] && echo "$Player   $i" >&2
+			DEBUGECHO "$Player   $i"
 			if PLAYER_RUNNING "$i";then
 				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
 				break
@@ -211,7 +215,7 @@ BAIDU_URI() {
 	       ((page++))
 	       Urls=($(echo $Htm|grep -o "http[^<>]*\.lrc"))
        	fi
-	[ "$Debug" = 1 ] && echo "BAIDU_URI $Lrcurl0 ${Urls[@]}" >&2
+	DEBUGECHO "BAIDU_URI $Lrcurl0 ${Urls[@]}"
 	nm="$((${2:-1}%$items))";((nm--));[ "$nm" -lt 0 ] && nm=0
 	[ "${Urls[$nm]}" = "" ] || echo -n "${Urls[$nm]}"
 }
@@ -228,37 +232,37 @@ SOGOU_URI() {
 	Lrcurl0="http://mp3.sogou.com/gecisearch.so?query=${1}&page=${page}"
 	[ "$Lrcurl" != "$Lrcurl0" ] && Lrcurl="$Lrcurl0" \
 	&& Htm="`wget "$Lrcurl"  -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
-	#[ "$Debug" = 1 ] && echo "HTM $htm" > /tmp/htm
+
 	a="`echo "$Htm" | grep -Fim"${nm}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
-	[ "$Debug" = 1 ] && echo "A $Lrcurl0 $a" >&2
+	DEBUGECHO "A $Lrcurl0 $a"
 	[ "$a" = "" ] || echo -n 'http://mp3.sogou.com/'"$a"
 }
 
 QIANQIAN_URI(){
     #得到千千歌词文件的下载URL
 	local htm
-	[ "$Debug" = 1 ] && echo "gb: $1 | Title: $2" >&2
+	DEBUGECHO "$1 | $2"
 	htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=1&pageflag=1&qword="$1"" -q -T 10 -O- 2>/dev/null`"
 	a="http://www.qianqian.com/""`echo "$htm" | grep -Fim1 lrcresult_frame | awk -F\\\" '{print $6}'`"
-	[ "$Debug" = 1 ] && echo "A $a" >&2
+	DEBUGECHO "A $a"
 	b="`wget "$a" --referer=www.qianqian.com -O- -q | grep -Fim1 downfromlrc | awk -F\\\" '{print $6}'`"
-	[ "$Debug" = 1 ] && echo "B $b" >&2
+	DEBUGECHO "B $b"
 	if [ "$b" != "" ]; then
 		echo -n 'http://www.qianqian.com/'"$b";
 	else
 		htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=3&pageflag=1&qword="$1"" -q -T 10 -O- 2>/dev/null`"
 		a="http://www.qianqian.com/""`echo "$htm" | grep -Fim1 lrcresult_frame | awk -F\\\" '{print $6}'`"
-		[ "$Debug" = 1 ] && echo "A $a" >&2
+		DEBUGECHO "A $a"
 		b="`wget "$a" --referer=www.qianqian.com -O- -q | grep -Fim1 downfromlrc | awk -F\\\" '{print $6}'`"
-		[ "$Debug" = 1 ] && echo "B $b" >&2
+		DEBUGECHO "B $b"
 		if [ "$b" != "" ]; then
 			echo -n 'http://www.qianqian.com/'"$b";
 		else
 			htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=3&pageflag=1&qword="$2"" -q -T 10 -O- 2>/dev/null`"
 			a="http://www.qianqian.com/""`echo "$htm" | grep -Fim1 lrcresult_frame | awk -F\\\" '{print $6}'`"
-			[ "$Debug" = 1 ] && echo "A $a" >&2
+			DEBUGECHO "A $a"
 			b="`wget "$a" --referer=www.qianqian.com -O- -q | grep -Fim1 downfromlrc | awk -F\\\" '{print $6}'`"
-			[ "$Debug" = 1 ] && echo "B $b" >&2
+			DEBUGECHO "B $b"
 			if [ "$b" != "" ]; then
 				echo -n 'http://www.qianqian.com/'"$b";
 			fi
@@ -284,7 +288,7 @@ DOWNLRC() {
 
 	#从歌词搜索里面找出当前歌曲的歌词下载页，默认从搜狗下
   	link="`eval "\${Uri:-SOGOU_URI} \"\$gb\" \"\$2\""`"
-	[ "$Debug" = 1 ] && echo "Link: $link" >&2
+	DEBUGECHO "Link: $link"
 	[ "$link" ] && {
 		if [ "$Uri" = "QIANQIAN_URI" ];then 
 			#千千的需要referer,且不需要转码.
@@ -332,7 +336,7 @@ CHECK_LRC() {
 		judge="LRC-RIGHT"
 	fi
 	echo "$judge"
-	[ "$Debug" = 1 ] && echo "CHECK_LRC: $judge; Checklrc => $3; File =>Ar:$ar0, Ti:$ti0; Title => Ar:$ar1, Ti:$ti1" >&2
+	DEBUGECHO "CHECK_LRC: $judge; Checklrc => $3; File =>Ar:$ar0, Ti:$ti0; Title => Ar:$ar1, Ti:$ti1"
 }
 
 CHECK_AND_DOWN_LRC() {
@@ -347,7 +351,7 @@ CHECK_AND_DOWN_LRC() {
     		DOWNLRC "$1" "$lrcnm"
 	       	((lrcnm++))
 	       	((downtimes++))
-		[ "$Debug" = 1 ] && echo "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
+		DEBUGECHO "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
     done
 }
 
@@ -374,7 +378,7 @@ GET_TITLE() {
 	fi  
 	ans="`DO_NAME "$ans"`"
 	echo "$ans"
-	[ "$Debug" = 1 ]&& echo "GET_TITLE: $ans" >&2
+	DEBUGECHO "GET_TITLE: $ans"
 	;;
 	"mocp")
 		tmp="`mocp -i`"
@@ -490,7 +494,7 @@ GET_TITLE() {
 		#[ "$t" ] || exit
 		[ "$t" = "Not playing" ] && t=""
 		DO_NAME "$t"
-		[ "$Debug" = 1 ]&& echo "GET_TITLE: $t" >&2
+		DEBUGECHO "GET_TITLE: $t"
 	;;
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
@@ -516,7 +520,7 @@ GET_PLTM() {
 	case "${1:-rhythmbox}" in
 	"mpd")
 		tm="`mpc --format a | grep "/" | awk -F' ' '{print $3}' | awk -F'/' '{print $1}'`"
-		[ "$Debug" = 1 ] && echo "GET_PLTM: ${tm}<<" >&2
+		DEBUGECHO "GET_PLTM: ${tm}<<"
 		[ -n "$tm" ] && {
 			min=${tm//:*/}
 			tmptm=${tm//*:/}
@@ -597,7 +601,7 @@ GET_LEN() {
 	case "${1:-rhythmbox}" in
 	"mpd")
 		tm="`mpc --format "%time%" | head -n -2`"
-		[ "$Debug" = 1 ] && echo "GET_LEN: ${tm}<<" >&2
+		DEBUGECHO "GET_LEN: ${tm}<<"
 		[ -n "$tm" ] && {
 			min=${tm//:*/}
 			tmptm=${tm//*:/}
@@ -753,7 +757,7 @@ DISPLAY() {
 	local line tmp
 
 	if [ "$1" ] && [ "$2" ];then
-		[ "$Debug" = 1 ]&& echo "DISPLAY: x$1x" >&2
+		DEBUGECHO "DISPLAY: x$1x"
 		#下面这一长句之所以这么繁复是为了让歌词文件里面本来是几行，但是因为某种原因合并到一行的烂文件还能正确显示
 		#例如：[02:19.46][00:59.86]XXXXXX[03:26.38][02:27.68][01:08.23]YYYYYY
 		#亦即即使你把歌曲文件连成只有一行也能正确显示而不会掉词。
@@ -893,7 +897,7 @@ PlayerStat="Unknow"
 
 GET_STAT |while read line0;do
     echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
-	[ "$Debug" = 1 ] && echo "GET_STAT: $line0<<" >&2
+	DEBUGECHO "GET_STAT: $line0<<"
 	[ "$line0" = "$line1" ] && continue
 	line1="$line0"
 	read op arg <<< "$line0"

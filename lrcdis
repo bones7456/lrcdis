@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090505
+Version=svn-090506
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -91,7 +91,7 @@ EOF
 }
 
 DEBUGECHO() {
-    [ "$Debug" = 1 ] && echo "  $@" >&2
+	[ "$Debug" = 1 ] && echo "  $@" >&2
 }
 
 DO_NAME() {
@@ -212,9 +212,9 @@ BAIDU_URI() {
 	[ "$Lrcurl" != "$Lrcurl0" ] && Lrcurl="$Lrcurl0" \
 	&& Htm="`wget "$Lrcurl"  -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
 	if [ ! "${Urls[@]}" ] || [ "$2" -gt "$items" ]; then
-	       ((page++))
-	       Urls=($(echo $Htm|grep -o "http[^<>]*\.lrc"))
-       	fi
+		   ((page++))
+		   Urls=($(echo $Htm|grep -o "http[^<>]*\.lrc"))
+	   	fi
 	DEBUGECHO "BAIDU_URI $Lrcurl0 ${Urls[@]}"
 	nm="$((${2:-1}%$items))";((nm--));[ "$nm" -lt 0 ] && nm=0
 	[ "${Urls[$nm]}" = "" ] || echo -n "${Urls[$nm]}"
@@ -239,7 +239,7 @@ SOGOU_URI() {
 }
 
 QIANQIAN_URI(){
-    #得到千千歌词文件的下载URL
+	#得到千千歌词文件的下载URL
 	local htm
 	DEBUGECHO "$1 | $2"
 	htm="`wget "http://www.qianqian.com/lrcresult.php?qfield=1&pageflag=1&qword="$1"" -q -T 10 -O- 2>/dev/null`"
@@ -292,8 +292,8 @@ DOWNLRC() {
 	[ "$link" ] && {
 		if [ "$Uri" = "QIANQIAN_URI" ];then 
 			#千千的需要referer,且不需要转码.
-  	    	wget "$link" --referer=www.qianqian.com -T 5 -t 2 -q -O - | tr -d "\r" > "$file"
-  	    else
+  			wget "$link" --referer=www.qianqian.com -T 5 -t 2 -q -O - | tr -d "\r" > "$file"
+  		else
 			wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
 		fi
 		{ echo '<xml>'; cat "$file"; echo '</xml>';} > /tmp/lrcdisTMP.xml
@@ -319,9 +319,9 @@ CHECK_LRC() {
 		[ "${2//-}" = "$2" ] || ar1="${2//-*}" && ar1="`echo $ar1|sed 's/^\ \+//;s/\ \+$//'`"
 		if [ ! "$ar1" ]; then
 			if [ "$ti0" = "$ti1" -o "$ar0" = "$ti1"  ]; then
-			       judge="LRC-RIGHT"
+				   judge="LRC-RIGHT"
 			else
-			       judge="LRC-WRONG"
+				   judge="LRC-WRONG"
 			fi
 		else
 			if [ "$ti0" = "$ti1" -a "$ar0" = "$ar1" ]; then
@@ -347,12 +347,12 @@ CHECK_AND_DOWN_LRC() {
 	local lrcnm downtimes
 	lrcnm=1;downtimes=0
 	[ -f "$Lrcdir/$1.lrc" ] || DOWNLRC "$1"
-    	while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-10}" ]; do
-    		DOWNLRC "$1" "$lrcnm"
-	       	((lrcnm++))
-	       	((downtimes++))
+		while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-10}" ]; do
+			DOWNLRC "$1" "$lrcnm"
+		   	((lrcnm++))
+		   	((downtimes++))
 		DEBUGECHO "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
-    done
+	done
 }
 
 GET_TITLE() {
@@ -512,10 +512,10 @@ GET_PLTM() {
    #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
 	local tm min sec tmptm
-    if [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
-        echo "write to fifo"
-        echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
-    fi
+	if [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
+		echo "write to fifo"
+		echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
+	fi
 
 	case "${1:-rhythmbox}" in
 	"mpd")
@@ -896,7 +896,7 @@ pltm="`GET_PLTM $Player`"
 PlayerStat="Unknow"
 
 GET_STAT |while read line0;do
-    echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
+	echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
 	DEBUGECHO "GET_STAT: $line0<<"
 	[ "$line0" = "$line1" ] && continue
 	line1="$line0"

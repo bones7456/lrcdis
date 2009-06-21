@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090621
+Version=090621
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -65,8 +65,8 @@ Uri=SOGOU_URI
 #是否检查歌词文件，yes/no，yes将会检查歌词文件是否
 #正确，若不正确则重新下载歌词
 Checklrc=yes
-#下载歌词的最大重试次数
-Maxdowntimes=6
+#下载歌词的最大重试次数,不宜过大
+Maxdowntimes=4
 #================================================
 #定义颜色（仅在cli模式下使用）
 black="38;5;0m"
@@ -349,15 +349,18 @@ CHECK_AND_DOWN_LRC() {
 
 	local lrcnm downtimes
 	lrcnm=1;downtimes=0
-	[ -f "$Lrcdir/$1.lrc" ] || DOWNLRC "$1"
-	while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-6}" ]; do
-		DOWNLRC "$1" "$lrcnm"
-	   	((lrcnm++))
-	   	((downtimes++))
-		DEBUGECHO "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
-	done
-	#如果都以上判断都失败,还是留下第一个比较保险.
-	[ "$downtimes" -ge "${Maxdowntimes:-6}" ] && DOWNLRC "$1"
+	[ -f "$Lrcdir/$1.lrc" ] || {
+		#对本地已有的歌词,不再进行正确性检查,避免下不到正确歌词的歌(或者歌词信息不标准的)一直试着下载
+		DOWNLRC "$1"
+		while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-4}" ]; do
+			DOWNLRC "$1" "$lrcnm"
+		   	((lrcnm++))
+		   	((downtimes++))
+			DEBUGECHO "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
+		done
+		#如果都以上判断都失败,还是留下第一个比较保险.
+		[ "$downtimes" -ge "${Maxdowntimes:-4}" ] && DOWNLRC "$1"
+	}
 }
 
 GET_TITLE() {

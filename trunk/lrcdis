@@ -5,10 +5,11 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090506
+Version=svn-090621
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
+Cookie_file=`tempfile`
 
 #=========================定义函数=============================
 
@@ -65,7 +66,7 @@ Uri=SOGOU_URI
 #正确，若不正确则重新下载歌词
 Checklrc=yes
 #下载歌词的最大重试次数
-Maxdowntimes=10
+Maxdowntimes=6
 #================================================
 #定义颜色（仅在cli模式下使用）
 black="38;5;0m"
@@ -229,10 +230,12 @@ SOGOU_URI() {
 	local a page nm
 	page="$((${2:-1}/5))"
 	nm="$((${2:-1}%5))"
+	#先获取一个cookie
+	[ ! -s "$Cookie_file" ] && \
+	wget --keep-session-cookies --save-cookies "$Cookie_file" "http://mp3.sogou.com" -O- >/dev/null 2>&1
 	Lrcurl0="http://mp3.sogou.com/gecisearch.so?query=${1}&page=${page}"
 	[ "$Lrcurl" != "$Lrcurl0" ] && Lrcurl="$Lrcurl0" \
-	&& Htm="`wget "$Lrcurl"  -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
-
+	&& Htm="`wget --load-cookies "$Cookie_file" --save-cookies "$Cookie_file" "$Lrcurl" -q -T 10 -O- 2>/dev/null | iconv -f gbk`"
 	a="`echo "$Htm" | grep -Fim"${nm}" "downlrc"|awk -F\\\" '{print $2}'|tail -n1`"
 	DEBUGECHO "A $Lrcurl0 $a"
 	[ "$a" = "" ] || echo -n 'http://mp3.sogou.com/'"$a"
@@ -294,7 +297,7 @@ DOWNLRC() {
 			#千千的需要referer,且不需要转码.
   			wget "$link" --referer=www.qianqian.com -T 5 -t 2 -q -O - | tr -d "\r" > "$file"
   		else
-			wget "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
+			wget --load-cookies "$Cookie_file" "$link" -T 5 -t 2 -q -O -|iconv -f gbk -c | tr -d "\r" > "$file"
 		fi
 		{ echo '<xml>'; cat "$file"; echo '</xml>';} > /tmp/lrcdisTMP.xml
 		xmllint /tmp/lrcdisTMP.xml --encode UTF-8 2>/dev/null > /tmp/lrcdisTMP.lrc && {
@@ -347,12 +350,14 @@ CHECK_AND_DOWN_LRC() {
 	local lrcnm downtimes
 	lrcnm=1;downtimes=0
 	[ -f "$Lrcdir/$1.lrc" ] || DOWNLRC "$1"
-		while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-10}" ]; do
-			DOWNLRC "$1" "$lrcnm"
-		   	((lrcnm++))
-		   	((downtimes++))
+	while [ "`CHECK_LRC "$Lrcdir/$1.lrc" "$1" "$2"`" = "LRC-WRONG" -a "$downtimes" -lt "${Maxdowntimes:-6}" ]; do
+		DOWNLRC "$1" "$lrcnm"
+	   	((lrcnm++))
+	   	((downtimes++))
 		DEBUGECHO "CHECK_AND_DOWN_LRC: Title => $1; Downtimes => $downtimes; Lrcnm => $lrcnm"
 	done
+	#如果都以上判断都失败,还是留下第一个比较保险.
+	[ "$downtimes" -ge "${Maxdowntimes:-6}" ] && DOWNLRC "$1"
 }
 
 GET_TITLE() {

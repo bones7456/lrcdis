@@ -318,10 +318,10 @@ CHECK_LRC() {
 		ti1="${2//*-}";ti1="`echo $ti1|sed 's/^\ \+//;s/\ \+$//'`"
 		[ "${2//-}" = "$2" ] || ar1="${2//-*}" && ar1="`echo $ar1|sed 's/^\ \+//;s/\ \+$//'`"
 		if [ ! "$ar1" ]; then
-			if [ "$ti0" = "$ti1" -o "$ar0" = "$ti1"  ]; then
-				   judge="LRC-RIGHT"
+			if [ "$ti0" = "$ti1" -o "$ar0" = "$ti1" ]; then
+				judge="LRC-RIGHT"
 			else
-				   judge="LRC-WRONG"
+				judge="LRC-WRONG"
 			fi
 		else
 			if [ "$ti0" = "$ti1" -a "$ar0" = "$ar1" ]; then
@@ -489,7 +489,7 @@ GET_TITLE() {
 	"rhythmbox")
 		#t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
 		#此处需要测试 --xiooli
-		t="`rhythmbox-client --no-start --print-playing-format %tt 2>/dev/null`"
+		t="`rhythmbox-client --no-start --print-playing-format %aa\ -\ %tt 2>/dev/null`"
 		#播放器还未播放的时候会返回空,不应该exit
 		#[ "$t" ] || exit
 		[ "$t" = "Not playing" ] && t=""

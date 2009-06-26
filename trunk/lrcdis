@@ -9,7 +9,8 @@ Version=090621
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
-Cookie_file=`tempfile`
+#tempfile不是谁都有..
+Cookie_file=/dev/shm/lrcdis-$USER-cookie-file-"`date +"%s.%N"`-$RANDOM"
 
 #=========================定义函数=============================
 
@@ -172,10 +173,11 @@ PLAYER_RUNNING(){
 	#一个参数, 播放器名
 	{
 	if [ "$1" = "quodlibet" ]; then
-		pgrep -fx "python `which quodlibet`" -u `PLAYER_USERS "$1"`
+		pgrep -fx "python `which quodlibet`" -u "`PLAYER_USERS "$1"`" && return 0  # 0 means true
 	else
-		pgrep -x "$1" -u `PLAYER_USERS "$1"`
+		pgrep -x "$1" -u "`PLAYER_USERS "$1"`" && return 0  # 0 means true
 	fi
+	return 1  # 1 means false
 	} >/dev/null 2>&1
 }
 
@@ -195,7 +197,7 @@ CHECK_PLAYER() {
 		for i in $players;do
 			DEBUGECHO "$Player   $i"
 			if PLAYER_RUNNING "$i";then
-				echo -n "$i"|sed "s/quodli/quodlibet/;s/amarokapp/amarok/"
+				echo -n "$i"|sed "s/amarokapp/amarok/"
 				break
 			fi
 		done
@@ -486,13 +488,13 @@ GET_TITLE() {
 		echo "$t"
 	;;
 	"quodlibet")
-		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong`"
-		#下面的tab符是需要的，不能去掉
-		a="`echo "$tmp" | grep -FA1 '	string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
-		t="`echo "$tmp" | grep -FA1 '	string "title"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong 2>/dev/null`"
+		#谁知道怎么才能在下面	grep -FA1 'string 的'和s中间放进一个tab吗？直接打tab会出错……
+		a="`echo "$tmp" | grep -FA1 'string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+		t="`echo "$tmp" | grep -FA1 'string "title"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		[ "$a" ] && echo -n "$a - "
 		echo "$t"
-
+		DEBUGECHO "GET_TITLE: $a - $t"
 	;;
 	"rhythmbox")
 		#t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
@@ -798,7 +800,10 @@ GET_STAT() {
 		((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
 		((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
 		sleep $Sleeptm
-		[ "$n0" = "1" ] && [ ! "`pgrep -x $Player`" ] && echo "Error 未发现被支持的播放器进程！" && exit
+		DEBUGECHO "$Player"
+		[ "$n0" = "1" ] && {
+			PLAYER_RUNNING "$Player" || { echo "Error 未发现被支持的播放器进程！" && exit; }
+		}
 		[ "$n0" = "1" ] && { 
 			pltm0="`GET_PLTM $Player`"
 			if [ "${pltm0:-0}" = "$pltm1" ] || [ "$pltm0" = "" ];then
@@ -812,7 +817,7 @@ GET_STAT() {
 		}
 		
 		[ "$n1" = "1" ] && {
-			title=`GET_TITLE $Player $Readname`
+			title="`GET_TITLE $Player $Readname`"
 			if [ "$title" ];then
 				echo "Title $title"
 				PlayerStat="Playing"

@@ -5,12 +5,12 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=090621
+Version=svn-090705
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
 #tempfile不是谁都有..
-Cookie_file=/dev/shm/lrcdis-$USER-cookie-file-"`date +"%s.%N"`-$RANDOM"
+Cookie_file=/dev/shm/lrcdis-cookie-file-$USER-"`date +"%s.%N"`-$RANDOM"
 
 #=========================定义函数=============================
 
@@ -911,7 +911,7 @@ pltm="`GET_PLTM $Player`"
 PlayerStat="Unknow"
 
 GET_STAT |while read line0;do
-	echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49
+	[ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ] && echo -n "">/dev/shm/lrcfifo #防止读lrcfifo时等待 amoblin 4.14 9:49 #非fifo模式不必要生成该文件 bones7456
 	DEBUGECHO "GET_STAT: $line0<<"
 	[ "$line0" = "$line1" ] && continue
 	line1="$line0"

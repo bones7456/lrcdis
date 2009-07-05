@@ -9,7 +9,6 @@ Version=svn-090705
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
-#tempfile不是谁都有..
 Cookie_file=/dev/shm/lrcdis-cookie-file-$USER-"`date +"%s.%N"`-$RANDOM"
 
 #=========================定义函数=============================
@@ -268,7 +267,6 @@ QIANQIAN_URI(){
 			fi
 		fi
 	fi
-#	referer="www.qianqian.com"
 }
 
 DOWNLRC() {
@@ -364,7 +362,6 @@ GET_TITLE() {
 	#获取当前播放的歌曲名字
 
 	#参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
-	#请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
 	#title和artist信息应该尽量同时获取(而不是使用两个命令分别获取)
 	#以免此时播放器进入下一首而造成错位 (A的标题和B的歌手名)，参见mocp, quodlibet的处理方法
 	local readname t a tmp flag ans sn
@@ -416,7 +413,6 @@ GET_TITLE() {
 	;;
 	"juk")
 		if [ "$readname" = "filename" ];then
-
 			#TODO (dont know how to get title & artist using dbus-send, use qdbus instead temporarily)
 			#f="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.playingString \
 			#|grep 'string'|awk -F\" '{print $2}'`"
@@ -439,7 +435,6 @@ GET_TITLE() {
 				f="`echo "$tmp" |grep 'string "file:'|perl -p -e 's/%(..)/pack("c", hex($1))/eg'|sed 's/^.*\///'`"
 				DO_NAME "$f"	
 			else
-				#下面的awk如果用-F\"则会出现：unexpected EOF while looking for matching `"' --xiooli
 				t="`echo "$tmp" |grep -FA1 'string "title"'|tail -n1|awk -F'"' '{print $2}'`"
 				a="`echo "$tmp" |grep -FA1 'string "artist"'|tail -n1|awk -F'"' '{print $2}'`"
 				if [ "$t" ];then
@@ -492,11 +487,7 @@ GET_TITLE() {
 		DEBUGECHO "GET_TITLE: $a - $t"
 	;;
 	"rhythmbox")
-		#t="`rhythmbox-client --print-playing --no-start 2>/dev/null|awk '{ gsub(/\.mp3|\.wma|\.MP3|\.WMA|未播放/,"",$0);print $0 }'`"
-		#此处需要测试 --xiooli
 		t="`rhythmbox-client --no-start --print-playing-format %aa\ -\ %tt 2>/dev/null`"
-		#播放器还未播放的时候会返回空,不应该exit
-		#[ "$t" ] || exit
 		[ "$t" = "Not playing" ] && t=""
 		DO_NAME "$t"
 		DEBUGECHO "GET_TITLE: $t"
@@ -514,7 +505,6 @@ GET_PLTM() {
    #参数一个，$1，播放器类型；返回播放器播放歌曲的当前时间 (转换成秒)
 
    #GET_PLTM如果是空那么就表示已经停止或者播放器退出。
-   #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
    
 	local tm min sec tmptm
 	if [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
@@ -698,7 +688,6 @@ DIS_WORDS() {
 	elif [ "$Dismode" = "fifo" -a -p "/dev/shm/lrcfifo" ];then
 		[ "$1" = T ] && line="****** $line ******"
 		[ "$1" = E ] && line="错误: $line"
-		#cat < /dev/shm/lrcfifo & # there's no need to empty the fifo file anymore.
 		echo -ne "$line" > /dev/shm/lrcfifo
 	elif [ "$Dismode" = "notify" -a "`which notify-send 2>/dev/null`" ];then
 		[ "$2" = "" ] && return

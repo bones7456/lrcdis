@@ -36,9 +36,9 @@ Sleeptm=0.6
 #一屏显示行数
 Row=10
 #歌曲标题的颜色（见最后的颜色定义）
-Titlecolor=\$green
+Titlecolor=green
 #歌曲歌词的颜色（见最后的颜色定义）
-Lyricscolor=\$smoothblue
+Lyricscolor=blue
 #==============[osd, notify & kdialog]=============
 #osd显示时的参数
 #osd显示位置：top, bottom
@@ -63,32 +63,23 @@ Ktimeout=5
 #====================[lrc]======================
 #从何处下载歌词: SOGOU_URI,BAIDU_URI,QIANQIAN_URI
 Uri=SOGOU_URI
-#是否检查歌词文件，yes/no，yes将会检查歌词文件是否
-#正确，若不正确则重新下载歌词
+#是否检查歌词文件，yes/no，yes将会检查歌词文件是否正确，若不正确则重新下载歌词
 Checklrc=yes
 #下载歌词的最大重试次数,不宜过大
 Maxdowntimes=4
 #================================================
 #定义颜色（仅在cli模式下使用）
-black="38;5;0m"
-red="38;5;1m"
-green="38;5;2m"
-yellow="38;5;3m"
-blue="38;5;4m"
-magenta="38;5;55m"
-cyan="38;5;6m"
-white="37;5;0m"
-coldblue="38;5;33m"
-smoothblue="38;5;111m"
-iceblue="38;5;45m"
-turqoise="38;5;50m"
-smoothgreen="38;5;42m"
+black="30"
+red="31"
+green="32"
+yellow="33"
+blue="34"
+magenta="35"
+cyan="36"
+white="37"
 #======================END========================
 EOF
 
-	. "$Conf_file" #在这里如果source一次的话颜色代码不会工作，大家看看怎么改。（source两次太恶了）-- xiooli
-	# how about save color codes into another file named "lrcdis.colors"
-	#sorry for not typing Chinese because of editor's bug   --oldherl
 	. "$Conf_file"
 }
 
@@ -99,12 +90,16 @@ DEBUGECHO() {
 DO_NAME() {
 	#  1 argument, the filename
 
-	#  removing .mp3/.wma/.ogg etc.
+	#  removing .mp3/.wma/.ogg/.ape/.flac etc.
 	local a
 	a="`basename "$1"`"
 	a="${a/%.mp3/}"; a="${a/%.MP3/}"
 	a="${a/%.wma/}"; a="${a/%.WMA/}"
 	a="${a/%.ogg/}"; a="${a/%.OGG/}"
+	a="${a/%.ape/}"; a="${a/%.APE/}"
+	a="${a/%.flac/}"; a="${a/%.FLAC/}"
+	# 去掉前置的一位或两位数字和".",一般是专辑中的序号
+	a="${a/#[0-9]./}"; a="${a/#[0-9][0-9]./}"
 	echo "$a"
 }
 
@@ -727,7 +722,7 @@ DIS_WORDS() {
 				echo -ne "\e[K"
 			done
 			tput cup "$N" 0
-			echo -ne "\033[0;$Lyricscolor "${line/#]/}" \033[0m"
+			echo -ne "\033[${!Lyricscolor}m "${line}"\033[0m"
 			if [ "$N" -lt "$Row" ];then
 				((N="$N"+1))
 			else
@@ -744,7 +739,7 @@ DIS_WORDS() {
 				echo -ne "\e[K"
 			done
 			tput cup 0 0
-			echo -ne "\033[0;$Titlecolor $line \033[0m"
+			echo -ne "\033[${!Titlecolor}m ${line}\033[0m"
 			((N=1))
 		fi
 	elif [ "$Dismode" = "kdialog" ];then

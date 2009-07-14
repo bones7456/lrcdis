@@ -24,7 +24,7 @@ INIT() {
 Lrcdir=~/.lyrics
 #显示模式： osd|notify|fifo|title|cli|kdialog|echo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd|mocp|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|rhythmbox
+#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox
 Player=rhythmbox
 #获取歌曲名称方式： id3(id3标签方式)|filename(文件名方式)
 Readname=id3
@@ -184,7 +184,7 @@ CHECK_PLAYER() {
 
 	#所有被支持的播放器都保存下面的字符串里面
 	#gmusicbrowser需要perl-net-dbus让其支持dbus通信才可以
-	players="rhythmbox audacious juk amarok amarokapp exaile gmusicbrowser quodlibet mocp mpd mplayer"
+	players="rhythmbox audacious juk amarok amarokapp exaile gmusicbrowser quodlibet qmmp mocp mpd muine mplayer"
 	if PLAYER_RUNNING "$Player";then
 		echo -n "$Player"
 	else
@@ -480,10 +480,29 @@ GET_TITLE() {
 	"quodlibet")
 		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong 2>/dev/null`"
 		#谁知道怎么才能在下面	grep -FA1 'string 的'和s中间放进一个tab吗？直接打tab会出错……
+		#难道是\t ?
 		a="`echo "$tmp" | grep -FA1 'string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		t="`echo "$tmp" | grep -FA1 'string "title"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		[ "$a" ] && echo -n "$a - "
 		echo "$t"
+		DEBUGECHO "GET_TITLE: $a - $t"
+	;;
+	"qmmp")
+		if [ "$readname" = "filename" ]; then
+			f="`dbus-send --print-reply --dest=org.mpris.qmmp /Player org.freedesktop.MediaPlayer.GetMetadata 2>/dev/null \
+			|grep -FA1 'string "location"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+			DO_NAME "$f"
+		else
+			tmp="`dbus-send --print-reply --dest=org.mpris.qmmp /Player org.freedesktop.MediaPlayer.GetMetadata 2>/dev/null`"
+			a="`echo "$tmp" | grep -FA1 'string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+			t="`echo "$tmp"|grep -FA1 'string "title"'|tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+			if [ "$t" ]; then
+				[ "$a" ] && echo -n "$a - "
+				echo "$t"
+			else
+				DO_NAME "`echo "$tmp"|grep -FA1 'string "location"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+			fi
+		fi
 		DEBUGECHO "GET_TITLE: $a - $t"
 	;;
 	"rhythmbox")
@@ -492,11 +511,20 @@ GET_TITLE() {
 		DO_NAME "$t"
 		DEBUGECHO "GET_TITLE: $t"
 	;;
+	"muine")
+		tmp="`dbus-send --print-reply --dest=org.gnome.Muine /org/gnome/Muine/Player org.gnome.Muine.Player.GetCurrentSong 2>/dev/null`"
+		a="`echo "$tmp"|grep 'artist:'|awk '{print $2}'`"
+		t="`echo "$tmp"|grep 'title:'|awk '{print $2}'`"
+		[ "$a" ] && echo -n "$a - "
+		echo "$t"
+		DEBUGECHO "GET_TITLE: $a - $t"
+	;;
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
 		echo "get_file_name">/dev/shm/mfifo
 		t="`cat "/dev/shm/ififo"|awk -F\' '/^ANS_FILENAME/{gsub(/\.mp3|\.wma|\.MP3|\.WMA/,"",$2);print $2}'`"
 		[ "$t" ] && echo "$t"
+		DEBUGECHO "GET_TITLE: $a - $t"
 	;;
 	esac
 }   
@@ -536,13 +564,13 @@ GET_PLTM() {
 		[ "$tm" ] && echo "$tm"
 	;;
 	"juk")
-		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.currentTime \
+		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.currentTime 2>/dev/null \
 		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet \
+			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
 			|grep int32|awk '{print $2}'`"
 			tm=$(($tm/1000))
 		else
@@ -551,7 +579,7 @@ GET_PLTM() {
 			[ "$tm" ] && echo "$tm"
 	;;
 	"exaile")
-		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query \
+		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query 2>/dev/null \
 		|tail -c 10 |awk -F[][] '{print $2}'`"
 		min=${tm//:*/}
 		tmptm=${tm//*:/}
@@ -559,18 +587,28 @@ GET_PLTM() {
 		[ "$tm" ] && echo $(($min*60+$sec))
 	;;
 	"gmusicbrowser")
-		tm="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.GetPosition \
+		tm="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.GetPosition  2>/dev/null \
 		|grep double|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"quodlibet")
-		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition \
+		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition 2>/dev/null \
 		|sed -n '$p'|awk '{print $2}'`"
+		[ "$tm" ] && echo $(($tm/1000))
+	;;
+	"qmmp")
+		tm="`dbus-send --print-reply --dest=org.mpris.qmmp /Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
+		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"rhythmbox")
 		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed 2>/dev/null \
 		|tail -n 1|awk '{print $2}'`"
+		[ "$tm" ] && echo "$tm"
+	;;
+	"muine")
+		tm="`dbus-send --print-reply --dest=org.gnome.Muine /org/gnome/Muine/Player org.gnome.Muine.Player.GetPosition 2>/dev/null \
+		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"mplayer")
@@ -650,6 +688,10 @@ GET_LEN() {
 		#下面代码未经测试，骨头有rhythmbox测试下吧：），主要是看时间是否是秒。 --xiooli
 		tm="`rhythmbox-client --no-start --print-playing-format %td 2>/dev/null`"
 		[ "$tm" ] && echo "$tm"
+	;;
+	"muine")
+		tm="`dbus-send --print-reply --dest=org.gnome.Muine /org/gnome/Muine/Player org.gnome.Muine.Player.GetCurrentSong \
+		|grep 'duration:'|grep -o "[0-9]*"`"
 	;;
 	"mplayer")
 		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit

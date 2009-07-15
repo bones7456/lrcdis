@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090705
+Version=svn-090715
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -364,7 +364,7 @@ GET_TITLE() {
 	#参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
 	#title和artist信息应该尽量同时获取(而不是使用两个命令分别获取)
 	#以免此时播放器进入下一首而造成错位 (A的标题和B的歌手名)，参见mocp, quodlibet的处理方法
-	local readname t a tmp flag ans sn
+	local readname t a tmp flag ans sn f
 
 	readname=${2:-id3}
 
@@ -458,14 +458,26 @@ GET_TITLE() {
 		fi
 	;;
 	"exaile")
-		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title \
-			| sed -n '$p'|awk -F\" '{print $2}'`"
+		if [ "$readname" = "filename" ];then
+			f="`dbus-send --print-reply --dest=org.exaile.ExaileInterface /org/exaile org.exaile.ExaileInterface.get_track_attr string:loc 2>/dev/null | awk '-F\"' '{print $2}'`"
+			DO_NAME "$f"
+		else
+			#exaile的输出还不合理,以后肯定会变,目前暂不支持ID3取法,先记下来.  而且这个好像只能分开取.
+			t="`dbus-send --print-reply --dest=org.exaile.ExaileInterface /org/exaile org.exaile.ExaileInterface.get_track_attr string:title 2>/dev/null`"
+			a="`dbus-send --print-reply --dest=org.exaile.ExaileInterface /org/exaile org.exaile.ExaileInterface.get_track_attr string:artist 2>/dev/null`"
+			[ "$a" ] && echo -n "$a - "
+			echo "$t"
+		fi
+		t="";a=""
+		#以下代码不知道从哪个版本的exaile开始就失效了... 先放着,也许有用老版本的用户,上面的输出空的下面还可以顶上.
+		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title 2>/dev/null \
+			| sed -n '$p'|awk '-F\"' '{print $2}'`"
 		tmp="`DO_NAME "$t"`"
 		if [ "$tmp" != "$t" ] ; then
 			echo "$tmp"
 		else
-			a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_artist \
-			| sed -n '$p'|awk -F\" '{print $2}'`"
+			a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_artist 2>/dev/null \
+			| sed -n '$p'|awk '-F\"' '{print $2}'`"
 			[ "$a" ] && echo -n "$a - "
 			echo "$t"
 		fi
@@ -579,6 +591,7 @@ GET_PLTM() {
 			[ "$tm" ] && echo "$tm"
 	;;
 	"exaile")
+		#由于exaile的bug,暂时木有取道,已报bug: https://bugs.launchpad.net/exaile/+bug/399610
 		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query 2>/dev/null \
 		|tail -c 10 |awk -F[][] '{print $2}'`"
 		min=${tm//:*/}
@@ -826,7 +839,6 @@ GET_STAT() {
 		((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
 		((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
 		sleep $Sleeptm
-		DEBUGECHO "$Player"
 		[ "$n0" = "1" ] && {
 			PLAYER_RUNNING "$Player" || { echo "Error 未发现被支持的播放器进程！" && exit; }
 		}

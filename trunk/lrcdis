@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090715
+Version=svn-090716
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -24,7 +24,7 @@ INIT() {
 Lrcdir=~/.lyrics
 #显示模式： osd|notify|fifo|title|cli|kdialog|echo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox
+#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox|banshee
 Player=rhythmbox
 #获取歌曲名称方式： id3(id3标签方式)|filename(文件名方式)
 Readname=id3
@@ -149,7 +149,6 @@ EOF
 }
 
 PLAYER_USERS() {
-
 	#一个参数,播放器进程名,返回该进程可能对应的用户ID.
 	id -u | tr -d "\n"
 	if [ "$1" = "mpd" ];then
@@ -163,15 +162,17 @@ PLAYER_USERS() {
 
 PLAYER_RUNNING(){
 	#判断播放器进程是否存在
-
 	#一个参数, 播放器名
+	#返回0表示进程存在,1表示不存在
 	{
 	if [ "$1" = "quodlibet" ]; then
-		pgrep -fx "python `which quodlibet`" -u "`PLAYER_USERS "$1"`" && return 0  # 0 means true
+		pgrep -fx "python `which quodlibet`" -u "`PLAYER_USERS "$1"`" && return 0
+	elif [ "$1" = "banshee" ]; then
+		pgrep -x "banshee-1" -u "`PLAYER_USERS "$1"`" && return 0
 	else
-		pgrep -x "$1" -u "`PLAYER_USERS "$1"`" && return 0  # 0 means true
+		pgrep -x "$1" -u "`PLAYER_USERS "$1"`" && return 0
 	fi
-	return 1  # 1 means false
+	return 1
 	} >/dev/null 2>&1
 }
 
@@ -184,7 +185,7 @@ CHECK_PLAYER() {
 
 	#所有被支持的播放器都保存下面的字符串里面
 	#gmusicbrowser需要perl-net-dbus让其支持dbus通信才可以
-	players="rhythmbox audacious juk amarok amarokapp exaile gmusicbrowser quodlibet qmmp mocp mpd muine mplayer"
+	players="rhythmbox audacious juk amarok amarokapp exaile banshee gmusicbrowser quodlibet qmmp mocp mpd muine mplayer"
 	if PLAYER_RUNNING "$Player";then
 		echo -n "$Player"
 	else
@@ -428,6 +429,26 @@ GET_TITLE() {
  			fi
  		fi
  	;;
+	"banshee")
+		tmp="`dbus-send --print-reply --dest=org.bansheeproject.Banshee \
+		/org/bansheeproject/Banshee/PlayerEngine \
+		org.bansheeproject.Banshee.PlayerEngine.GetCurrentTrack 2>/dev/null \
+		| tr '\n()' ' \n\n' | grep 'string'`"
+		if [ "$readname" = "filename" ];then
+			f="`echo "$tmp" |grep '"local-path"'|awk -F'"' '{print $4}'`"
+			DO_NAME "$f"
+		else
+			t="`echo "$tmp" |grep '"name"'|awk -F'"' '{print $4}'`"
+			a="`echo "$tmp" |grep '"artist"'|awk -F'"' '{print $4}'`"
+			if [ "$t" ];then
+				[ "$a" ] && echo -n "$a - "
+				echo "$t"
+			else
+				f="`echo "$tmp" |grep '"local-path"'|awk -F'"' '{print $4}'`"
+				DO_NAME "$f"
+			fi
+		fi
+	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
 			tmp="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata`"
@@ -580,11 +601,17 @@ GET_PLTM() {
 		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
+	"banshee")
+		tm="`dbus-send --print-reply --dest=org.bansheeproject.Banshee \
+		/org/bansheeproject/Banshee/PlayerEngine \
+		org.bansheeproject.Banshee.PlayerEngine.GetPosition 2>/dev/null \
+		|grep 'int32'|awk '{print int($2/1000)}'`"
+		[ "$tm" ] && echo "$tm"
+	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
 			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
-			|grep int32|awk '{print $2}'`"
-			tm=$(($tm/1000))
+			|grep int32|awk '{print int($2/1000)}'`"
 		else
 			tm="`dcop amarok player trackCurrentTime`"
 		fi

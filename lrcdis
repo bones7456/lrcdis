@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090719
+Version=svn-090719-2
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -90,13 +90,15 @@ DO_NAME() {
 	#  1 argument, the filename
 
 	#  removing .mp3/.wma/.ogg/.ape/.flac etc.
-	local a
+	local	a
 	a="`basename "$1"`"
-	a="${a/%.mp3/}"; a="${a/%.MP3/}"
-	a="${a/%.wma/}"; a="${a/%.WMA/}"
-	a="${a/%.ogg/}"; a="${a/%.OGG/}"
-	a="${a/%.ape/}"; a="${a/%.APE/}"
-	a="${a/%.flac/}"; a="${a/%.FLAC/}"
+	#理论上说以 . 分隔的最后那部分是扩展名
+	a="${a%.[a-zA-Z0-9]*}"
+	#a="${a/%.mp3/}"; a="${a/%.MP3/}"
+	#a="${a/%.wma/}"; a="${a/%.WMA/}"
+	#a="${a/%.ogg/}"; a="${a/%.OGG/}"
+	#a="${a/%.ape/}"; a="${a/%.APE/}"
+	#a="${a/%.flac/}"; a="${a/%.FLAC/}"
 	# 去掉前置的一位或两位数字和".",一般是专辑中的序号
 	a="${a/#[0-9]./}"; a="${a/#[0-9][0-9]./}"
 	echo "$a"
@@ -371,18 +373,18 @@ GET_TITLE() {
 
 	case "${1:-rhythmbox}" in
 	"mpd")
-	flag="LRCDISXXX"
-	if [ "$readname" = "filename" ] ; then
-		  sn="`mpc --format "$flag%file%" | grep "$flag" `"
-		  ans="${sn/$flag/}"
-	else  
-		  sn="`mpc --format "[$flag[%artist% - ]%title%]|$flag[%file%]" | grep "$flag" `"
-		  ans="${sn/$flag/}"
-	fi  
-	ans="`DO_NAME "$ans"`"
-	echo "$ans"
-	DEBUGECHO "GET_TITLE: $ans"
-	;;
+		flag="LRCDISXXX"
+		if [ "$readname" = "filename" ] ; then
+			  sn="`mpc --format "$flag%file%" | grep "$flag" `"
+			  ans="${sn/$flag/}"
+		else  
+			  sn="`mpc --format "[$flag[%artist% - ]%title%]|$flag[%file%]" | grep "$flag" `"
+			  ans="${sn/$flag/}"
+		fi  
+		ans="`DO_NAME "$ans"`"
+		echo "$ans"
+		DEBUGECHO "GET_TITLE: $ans"
+		;;
 	"mocp")
 		tmp="`mocp -i`"
 		if [ "$readname" = "filename" ];then
@@ -428,17 +430,24 @@ GET_TITLE() {
 	;;
 	"juk")
 		if [ "$readname" = "filename" ];then
-			#TODO (dont know how to get title & artist using dbus-send, use qdbus instead temporarily)
-			#f="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.playingString \
-			#|grep 'string'|awk -F\" '{print $2}'`"
- 			f="`qdbus org.kde.juk /Player trackProperty Path`"
+ 			f="`dbus-send --session --print-reply --dest=org.kde.juk \
+			/Player org.kde.juk.player.trackProperty string:Path 2>/dev/null \
+			|grep -FA1 "string"|awk '{print $2}'`"
  			DO_NAME "$f"
  		else
- 			t="`qdbus org.kde.juk /Player trackProperty Title`"
+ 			t="`dbus-send --session --print-reply --dest=org.kde.juk \
+			/Player org.kde.juk.player.trackProperty string:Title 2>/dev/null \
+			|grep -FA1 "string"|awk '{print $2}'`"
+			a="`dbus-send --session --print-reply --dest=org.kde.juk \
+			/Player org.kde.juk.player.trackProperty string:Artist 2>/dev/null \
+			|grep -FA1 "string"|awk '{print $2}'`"
  			if [ "$t" ];then
- 				echo "$t"
+				[ "$a" ] && echo -n "$a - "
+				echo "$t"
  			else
- 				f="`qdbus org.kde.juk /Player trackProperty Path`"
+ 				f="`dbus-send --session --print-reply --dest=org.kde.juk \
+				/Player org.kde.juk.player.trackProperty string:Path 2>/dev/null \
+				|grep -FA1 "string"|awk '{print $2}'`"
  				DO_NAME "$f"
  			fi
  		fi
@@ -465,9 +474,11 @@ GET_TITLE() {
 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			tmp="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata`"
+			tmp="`dbus-send --session --print-reply --dest=org.kde.amarok \
+			/Player org.freedesktop.MediaPlayer.GetMetadata`"
 			if [ "$readname" = "filename" ];then
-				f="`echo "$tmp" |grep 'string "file:'|perl -p -e 's/%(..)/pack("c", hex($1))/eg'|sed 's/^.*\///'`"
+				f="`echo "$tmp" |grep 'string "file:' \
+				|perl -p -e 's/%(..)/pack("c", hex($1))/eg'|sed 's/^.*\///'`"
 				DO_NAME "$f"	
 			else
 				t="`echo "$tmp" |grep -FA1 'string "title"'|tail -n1|awk -F'"' '{print $2}'`"
@@ -494,38 +505,46 @@ GET_TITLE() {
 	;;
 	"exaile")
 		if [ "$readname" = "filename" ];then
-			f="`dbus-send --print-reply --dest=org.exaile.ExaileInterface /org/exaile org.exaile.ExaileInterface.get_track_attr string:loc 2>/dev/null | awk '-F\"' '{print $2}'`"
+			f="`dbus-send --print-reply --dest=org.exaile.ExaileInterface \
+			/org/exaile org.exaile.ExaileInterface.get_track_attr string:loc 2>/dev/null \
+			| awk '-F\"' '{print $2}'`"
 			DO_NAME "$f"
 		else
 			#exaile的输出还不合理,以后肯定会变,目前暂不支持ID3取法,先记下来.  而且这个好像只能分开取.
-			t="`dbus-send --print-reply --dest=org.exaile.ExaileInterface /org/exaile org.exaile.ExaileInterface.get_track_attr string:title 2>/dev/null`"
-			a="`dbus-send --print-reply --dest=org.exaile.ExaileInterface /org/exaile org.exaile.ExaileInterface.get_track_attr string:artist 2>/dev/null`"
+			t="`dbus-send --print-reply --dest=org.exaile.ExaileInterface \
+			/org/exaile org.exaile.ExaileInterface.get_track_attr string:title 2>/dev/null`"
+			a="`dbus-send --print-reply --dest=org.exaile.ExaileInterface \
+			/org/exaile org.exaile.ExaileInterface.get_track_attr string:artist 2>/dev/null`"
 			[ "$a" ] && echo -n "$a - "
 			echo "$t"
 		fi
 		t="";a=""
 		#以下代码不知道从哪个版本的exaile开始就失效了... 先放着,也许有用老版本的用户,上面的输出空的下面还可以顶上.
-		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_title 2>/dev/null \
+		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface \
+		/DBusInterfaceObject org.exaile.DBusInterface.get_title 2>/dev/null \
 			| sed -n '$p'|awk '-F\"' '{print $2}'`"
 		tmp="`DO_NAME "$t"`"
 		if [ "$tmp" != "$t" ] ; then
 			echo "$tmp"
 		else
-			a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_artist 2>/dev/null \
+			a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface \
+			/DBusInterfaceObject org.exaile.DBusInterface.get_artist 2>/dev/null \
 			| sed -n '$p'|awk '-F\"' '{print $2}'`"
 			[ "$a" ] && echo -n "$a - "
 			echo "$t"
 		fi
 	;;
 	"gmusicbrowser")
-		tmp="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.CurrentSong`"
+		tmp="`dbus-send --print-reply --dest=org.gmusicbrowser \
+		/org/gmusicbrowser org.gmusicbrowser.CurrentSong`"
 		a="`echo "$tmp" | grep -FA1 'string "artist"'| tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		t="`echo "$tmp" | grep -FA1 'string "title"'| tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 		[ "$a" ] && echo -n "$a - "
 		echo "$t"
 	;;
 	"quodlibet")
-		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong 2>/dev/null`"
+		tmp="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet \
+		/net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong 2>/dev/null`"
 		#谁知道怎么才能在下面	grep -FA1 'string 的'和s中间放进一个tab吗？直接打tab会出错……
 		#难道是\t ?
 		a="`echo "$tmp" | grep -FA1 'string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
@@ -536,18 +555,22 @@ GET_TITLE() {
 	;;
 	"qmmp")
 		if [ "$readname" = "filename" ]; then
-			f="`dbus-send --print-reply --dest=org.mpris.qmmp /Player org.freedesktop.MediaPlayer.GetMetadata 2>/dev/null \
+			f="`dbus-send --print-reply --dest=org.mpris.qmmp \
+			/Player org.freedesktop.MediaPlayer.GetMetadata 2>/dev/null \
 			|grep -FA1 'string "location"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 			DO_NAME "$f"
 		else
-			tmp="`dbus-send --print-reply --dest=org.mpris.qmmp /Player org.freedesktop.MediaPlayer.GetMetadata 2>/dev/null`"
-			a="`echo "$tmp" | grep -FA1 'string "artist"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+			tmp="`dbus-send --print-reply --dest=org.mpris.qmmp \
+			/Player org.freedesktop.MediaPlayer.GetMetadata 2>/dev/null`"
+			a="`echo "$tmp" | grep -FA1 'string "artist"' | tail -n 1 \
+			|awk '-F[\"\"]' '{print $2}'`"
 			t="`echo "$tmp"|grep -FA1 'string "title"'|tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
 			if [ "$t" ]; then
 				[ "$a" ] && echo -n "$a - "
 				echo "$t"
 			else
-				DO_NAME "`echo "$tmp"|grep -FA1 'string "location"' | tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
+				DO_NAME "`echo "$tmp"|grep -FA1 'string "location"'|tail -n 1 \
+				|awk '-F[\"\"]' '{print $2}'`"
 			fi
 		fi
 		DEBUGECHO "GET_TITLE: $a - $t"
@@ -559,7 +582,8 @@ GET_TITLE() {
 		DEBUGECHO "GET_TITLE: $t"
 	;;
 	"muine")
-		tmp="`dbus-send --print-reply --dest=org.gnome.Muine /org/gnome/Muine/Player org.gnome.Muine.Player.GetCurrentSong 2>/dev/null`"
+		tmp="`dbus-send --print-reply --dest=org.gnome.Muine \
+		/org/gnome/Muine/Player org.gnome.Muine.Player.GetCurrentSong 2>/dev/null`"
 		a="`echo "$tmp"|grep 'artist:'|awk '{print $2}'`"
 		t="`echo "$tmp"|grep 'title:'|awk '{print $2}'`"
 		[ "$a" ] && echo -n "$a - "
@@ -615,7 +639,8 @@ GET_PLTM() {
 		[ "$tm" ] && echo "$tm"
 	;;
 	"juk")
-		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.currentTime 2>/dev/null \
+		tm="`dbus-send --print-reply --dest=org.kde.juk \
+		/Player org.kde.juk.player.currentTime 2>/dev/null \
 		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
@@ -628,7 +653,8 @@ GET_PLTM() {
 	;;
 	"amarok")
 		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
+			tm="`dbus-send --session --print-reply --dest=org.kde.amarok \
+			/Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
 			|grep int32|awk '{print int($2/1000)}'`"
 		else
 			tm="`dcop amarok player trackCurrentTime`"
@@ -637,7 +663,8 @@ GET_PLTM() {
 	;;
 	"exaile")
 		#由于exaile的bug,暂时木有取道,已报bug: https://bugs.launchpad.net/exaile/+bug/399610
-		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.query 2>/dev/null \
+		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface \
+		/DBusInterfaceObject org.exaile.DBusInterface.query 2>/dev/null \
 		|tail -c 10 |awk -F[][] '{print $2}'`"
 		min=${tm//:*/}
 		tmptm=${tm//*:/}
@@ -645,27 +672,32 @@ GET_PLTM() {
 		[ "$tm" ] && echo $(($min*60+$sec))
 	;;
 	"gmusicbrowser")
-		tm="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.GetPosition  2>/dev/null \
+		tm="`dbus-send --print-reply --dest=org.gmusicbrowser \
+		/org/gmusicbrowser org.gmusicbrowser.GetPosition  2>/dev/null \
 		|grep double|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"quodlibet")
-		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition 2>/dev/null \
+		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet \
+		/net/sacredchao/QuodLibet net.sacredchao.QuodLibet.GetPosition 2>/dev/null \
 		|sed -n '$p'|awk '{print $2}'`"
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"qmmp")
-		tm="`dbus-send --print-reply --dest=org.mpris.qmmp /Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
+		tm="`dbus-send --print-reply --dest=org.mpris.qmmp \
+		/Player org.freedesktop.MediaPlayer.PositionGet 2>/dev/null \
 		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo $(($tm/1000))
 	;;
 	"rhythmbox")
-		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox /org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed 2>/dev/null \
+		tm="`dbus-send --session --print-reply --dest=org.gnome.Rhythmbox \
+		/org/gnome/Rhythmbox/Player org.gnome.Rhythmbox.Player.getElapsed 2>/dev/null \
 		|tail -n 1|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
 	"muine")
-		tm="`dbus-send --print-reply --dest=org.gnome.Muine /org/gnome/Muine/Player org.gnome.Muine.Player.GetPosition 2>/dev/null \
+		tm="`dbus-send --print-reply --dest=org.gnome.Muine \
+		/org/gnome/Muine/Player org.gnome.Muine.Player.GetPosition 2>/dev/null \
 		|grep 'int32'|awk '{print $2}'`"
 		[ "$tm" ] && echo "$tm"
 	;;
@@ -826,7 +858,7 @@ GET_STAT() {
 				PlayerStat="Unknow"
 			fi
 		}
-		[ "$PlayerStat" = "Playing" ] && echo "Time $(echo "${pltm0:-0}+$Sleeptm*$n0"|bc -l)"
+		[ "$PlayerStat" = "Playing" ] && echo "Time $(eval "echo|awk '{print "${pltm0:-0}+$Sleeptm*$n0"}'")"
 	done
 }
 
@@ -934,7 +966,7 @@ GET_STAT |while read line0;do
 	}
 	[ "$op" = "Time" ] && [ "$lrc" ] && {
 		arg="${arg:-0}";
-		arg="`bc -l <<< "$arg+$offset" `"
+		arg="`eval "echo|awk '{print "$arg+$offset"}'"`"
 		arg=${arg//.*/};arg=${arg:-0}
 		arg="`printf '%.2d:%.2d' $(($arg/60)) $(($arg%60))`"
  		DISPLAY "$arg" "$lrc"

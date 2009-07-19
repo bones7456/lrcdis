@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090716
+Version=svn-090719
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -24,7 +24,7 @@ INIT() {
 Lrcdir=~/.lyrics
 #显示模式： osd|notify|fifo|title|cli|kdialog|echo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox|banshee
+#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox|banshee|audacious2
 Player=rhythmbox
 #获取歌曲名称方式： id3(id3标签方式)|filename(文件名方式)
 Readname=id3
@@ -185,7 +185,7 @@ CHECK_PLAYER() {
 
 	#所有被支持的播放器都保存下面的字符串里面
 	#gmusicbrowser需要perl-net-dbus让其支持dbus通信才可以
-	players="rhythmbox audacious juk amarok amarokapp exaile banshee gmusicbrowser quodlibet qmmp mocp mpd muine mplayer"
+	players="rhythmbox audacious juk amarok amarokapp exaile banshee gmusicbrowser quodlibet qmmp mocp mpd muine mplayer audacious2"
 	if PLAYER_RUNNING "$Player";then
 		echo -n "$Player"
 	else
@@ -412,6 +412,20 @@ GET_TITLE() {
 			fi
 		fi
 	;;
+	"audacious2")
+		if [ "$readname" = "filename" ];then
+			f="`audtool2 current-song-filename`"
+			DO_NAME "$f"
+		else
+			t="`audtool2 current-song`"
+			if [ "$t" ];then
+				echo "$t"
+			else
+				f="`audtool2 current-song-filename`"
+				DO_NAME "$f"
+			fi
+		fi
+	;;
 	"juk")
 		if [ "$readname" = "filename" ];then
 			#TODO (dont know how to get title & artist using dbus-send, use qdbus instead temporarily)
@@ -596,6 +610,10 @@ GET_PLTM() {
 		tm="`audtool current-song-output-length-seconds`"
 		[ "$tm" ] && echo "$tm"
 	;;
+	"audacious2")
+		tm="`audtool2 current-song-output-length-seconds`"
+		[ "$tm" ] && echo "$tm"
+	;;
 	"juk")
 		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.currentTime 2>/dev/null \
 		|grep 'int32'|awk '{print $2}'`"
@@ -656,88 +674,6 @@ GET_PLTM() {
 		echo "get_time_pos">/dev/shm/mfifo
 		tm="`cat "/dev/shm/ififo"|sed 's/^.*=//;s/\..*$//'`"
 		[ "${tm//-/}" = "$tm" -a "$tm" != "0" ] && echo "$tm"
-	;;
-	esac
-
-}
-
-GET_LEN() {
-   #参数一个，$1，播放器类型；返回播放器当前播放歌曲的总时间 (转换成秒)
-
-   #这个东西是用来干什么的？如果用来判断歌词合不合法的话直接对比歌词文件里面的ar和ti就好阿，
-   #因为歌词里面并没有总时间的。--xiooli
-   # not used in the program since it's not done...  --oldherl
-   #请大家最好不要使用'"'这样的东西，而是用\"来代替，这样大多数编辑器高亮都能认识…… --oldherl
-   
-	local tm min sec tmptm
-
-	case "${1:-rhythmbox}" in
-	"mpd")
-		tm="`mpc --format "%time%" | head -n -2`"
-		DEBUGECHO "GET_LEN: ${tm}<<"
-		[ -n "$tm" ] && {
-			min=${tm//:*/}
-			tmptm=${tm//*:/}
-			sec=${tmptm/#0/}
-			echo "$(($min*60+$sec))"
-		}
-	;;
-	"mocp")
-		tm="`mocp -i | grep "^TotalSec: " | sed -e 's/TotalSec:\ //'`"
-		[ "$tm" ] && echo $tm
-	;;
-	"audacious")
-		tm="`audtool current-song-length-seconds`"
-		[ "$tm" ] && echo "$tm"
-	;;
-	"juk")
-		tm="`dbus-send --print-reply --dest=org.kde.juk /Player org.kde.juk.player.totalTime \
-		|grep 'int32'|awk '{print $2}'`"
-		[ "$tm" ] && echo "$tm"
-	;;
-	"amarok")
-		if [ "`amarok -v|grep "Amarok:\ *2\.*"`" ];then
-			tm="`dbus-send --session --print-reply --dest=org.kde.amarok /Player org.freedesktop.MediaPlayer.GetMetadata \
-			|grep -FA1 'string "mtime"'|tail -n1|awk '{print $3}'`"
-			[ "$tm" ] && echo $(($tm/1000))
-		else
-			#下面amarok1的总时间代码未经测试 --xiooli
-			tm="`dcop amarok player totalTime 2>/dev/null`"
-			[ "$tm" ] && echo $(($tm/1000))
-		fi
-	;;
-	"exaile")
-		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface /DBusInterfaceObject org.exaile.DBusInterface.get_length \
-		| tail -n 1 |awk -F\" '{print $2}'`"
-		min=${tm//:*/}
-		tmptm=${tm//*:/}
-		sec=${tmptm/#0/}
-		[ "$tm" ] && echo $(($min*60+$sec))
-	;;
-	"gmusicbrowser")
-		tm="`dbus-send --print-reply --dest=org.gmusicbrowser /org/gmusicbrowser org.gmusicbrowser.CurrentSong \
-		|grep -FA1 'string "length"'| tail -n 1 | awk '-F[\"\"]' '{print $2}'`"
-		[ "$tm" ] && echo "$tm"
-	;;
-	"quodlibet")
-		tm="`dbus-send --session --print-reply --dest=net.sacredchao.QuodLibet /net/sacredchao/QuodLibet net.sacredchao.QuodLibet.CurrentSong \
-		|grep -FA1 string\ \"~#length\" | tail -n 1 | cut -d\" -f2 `"
-		[ "$tm" ] && echo "$tm"
-	;;
-	"rhythmbox")
-		#下面代码未经测试，骨头有rhythmbox测试下吧：），主要是看时间是否是秒。 --xiooli
-		tm="`rhythmbox-client --no-start --print-playing-format %td 2>/dev/null`"
-		[ "$tm" ] && echo "$tm"
-	;;
-	"muine")
-		tm="`dbus-send --print-reply --dest=org.gnome.Muine /org/gnome/Muine/Player org.gnome.Muine.Player.GetCurrentSong \
-		|grep 'duration:'|grep -o "[0-9]*"`"
-	;;
-	"mplayer")
-		[ -p "/dev/shm/mfifo" -a -p "/dev/shm/ififo" -a "`ps ax|grep "mplayer"|grep "/dev/shm/mfifo"`" ] || exit
-		echo "get_time_length">/dev/shm/mfifo
-		tm="`cat "/dev/shm/ififo"|sed 's/ANS_LENGTH=//;s/\..*$//'`"
-		[ "$tm" ] && echo "$tm"
 	;;
 	esac
 

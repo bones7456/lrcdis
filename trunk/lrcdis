@@ -314,10 +314,10 @@ CHECK_LRC() {
 	
 	local ti0 ti1 ar0 ar1 judge
 	if [ "${3:-yes}" = "yes" ];then
-		ti0="`cat "$1"|grep -o "\[ti:[^\[]*\]"|tr -d "[]"|tr [A-Z] [a-z]`";ti0="${ti0/ti:}"
-		ar0="`cat "$1"|grep -o "\[ar:[^\[]*\]"|tr -d "[]"|tr [A-Z] [a-z]`";ar0="${ar0/ar:}"
-		ti1="${2//*-}";ti1="`echo $ti1|sed 's/^\ \+//;s/\ \+$//'|tr [A-Z] [a-z]`"
-		[ "${2//-}" = "$2" ] || ar1="${2//-*}" && ar1="`echo $ar1|sed 's/^\ \+//;s/\ \+$//'|tr [A-Z] [a-z]`"
+		ti0="`cat "$1"|grep -o "\[ti:[^\[]*\]"|tr -d "[]"|tr [:upper:] [:lower:]`";ti0="${ti0/ti:}"
+		ar0="`cat "$1"|grep -o "\[ar:[^\[]*\]"|tr -d "[]"|tr [:upper:] [:lower:]`";ar0="${ar0/ar:}"
+		ti1="${2//*-}";ti1="`echo $ti1|sed 's/^\ \+//;s/\ \+$//'|tr [:upper:] [:lower:]`"
+		[ "${2//-}" = "$2" ] || ar1="${2//-*}" && ar1="`echo $ar1|sed 's/^\ \+//;s/\ \+$//'|tr [:upper:] [:lower:]`"
 		if [ ! "$ar1" ]; then
 			if [ "$ti0" = "$ti1" -o "$ar0" = "$ti1" ]; then
 				judge="LRC-RIGHT"

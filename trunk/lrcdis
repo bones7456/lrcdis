@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090719-2
+Version=svn-090831
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -505,31 +505,17 @@ GET_TITLE() {
 	;;
 	"exaile")
 		if [ "$readname" = "filename" ];then
-			f="`dbus-send --print-reply --dest=org.exaile.ExaileInterface \
-			/org/exaile org.exaile.ExaileInterface.get_track_attr string:loc 2>/dev/null \
-			| awk '-F\"' '{print $2}'`"
+			f="`dbus-send --print-reply --dest=org.exaile.Exaile \
+			/org/exaile/Exaile org.exaile.Exaile.GetTrackAttr string:__loc 2>/dev/null \
+			| grep -v "method return " | awk '-F\"' '{print $2}'`"
 			DO_NAME "$f"
 		else
-			#exaile的输出还不合理,以后肯定会变,目前暂不支持ID3取法,先记下来.  而且这个好像只能分开取.
-			t="`dbus-send --print-reply --dest=org.exaile.ExaileInterface \
-			/org/exaile org.exaile.ExaileInterface.get_track_attr string:title 2>/dev/null`"
-			a="`dbus-send --print-reply --dest=org.exaile.ExaileInterface \
-			/org/exaile org.exaile.ExaileInterface.get_track_attr string:artist 2>/dev/null`"
-			[ "$a" ] && echo -n "$a - "
-			echo "$t"
-		fi
-		t="";a=""
-		#以下代码不知道从哪个版本的exaile开始就失效了... 先放着,也许有用老版本的用户,上面的输出空的下面还可以顶上.
-		t="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface \
-		/DBusInterfaceObject org.exaile.DBusInterface.get_title 2>/dev/null \
-			| sed -n '$p'|awk '-F\"' '{print $2}'`"
-		tmp="`DO_NAME "$t"`"
-		if [ "$tmp" != "$t" ] ; then
-			echo "$tmp"
-		else
-			a="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface \
-			/DBusInterfaceObject org.exaile.DBusInterface.get_artist 2>/dev/null \
-			| sed -n '$p'|awk '-F\"' '{print $2}'`"
+			t="`dbus-send --print-reply --dest=org.exaile.Exaile \
+			/org/exaile/Exaile org.exaile.Exaile.GetTrackAttr string:title 2>/dev/null \
+			| grep -v "method return " |awk -F'\"' '{print $2}'`"
+			a="`dbus-send --print-reply --dest=org.exaile.Exaile \
+			/org/exaile/Exaile org.exaile.Exaile.GetTrackAttr string:artist 2>/dev/null \
+			| grep -v "method return " |awk -F'\"' '{print $2}'`"
 			[ "$a" ] && echo -n "$a - "
 			echo "$t"
 		fi
@@ -662,10 +648,9 @@ GET_PLTM() {
 			[ "$tm" ] && echo "$tm"
 	;;
 	"exaile")
-		#由于exaile的bug,暂时木有取道,已报bug: https://bugs.launchpad.net/exaile/+bug/399610
-		tm="`dbus-send --session --print-reply --dest=org.exaile.DBusInterface \
-		/DBusInterfaceObject org.exaile.DBusInterface.query 2>/dev/null \
-		|tail -c 10 |awk -F[][] '{print $2}'`"
+		tm="`dbus-send --print-reply --dest=org.exaile.Exaile \
+		/org/exaile/Exaile org.exaile.Exaile.CurrentPosition 2>/dev/null \
+		| grep -v "method return " | awk -F'\"' '{print $2}'`"
 		min=${tm//:*/}
 		tmptm=${tm//*:/}
 		sec=${tmptm/#0/}

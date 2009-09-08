@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090831
+Version=svn-090908
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -24,7 +24,7 @@ INIT() {
 Lrcdir=~/.lyrics
 #显示模式： osd|notify|fifo|title|cli|kdialog|echo (将歌词输出到一个管道文件，以便用其他命令访问)
 Dismode=osd
-#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox|banshee|audacious2
+#播放器类型： mpd|mocp|muine|audacious|juk|amarok|exaile|gmusicbrowser|quodlibet|qmmp|rhythmbox|banshee|audacious2|xmms2
 Player=rhythmbox
 #获取歌曲名称方式： id3(id3标签方式)|filename(文件名方式)
 Readname=id3
@@ -171,6 +171,8 @@ PLAYER_RUNNING(){
 		pgrep -fx "python `which quodlibet`" -u "`PLAYER_USERS "$1"`" && return 0
 	elif [ "$1" = "banshee" ]; then
 		pgrep -x "banshee-1" -u "`PLAYER_USERS "$1"`" && return 0
+	elif [ "$1" = "xmms2" ]; then
+		pgrep -x "xmms2d" -u "`PLAYER_USERS "$1"`" && return 0
 	else
 		pgrep -x "$1" -u "`PLAYER_USERS "$1"`" && return 0
 	fi
@@ -187,7 +189,7 @@ CHECK_PLAYER() {
 
 	#所有被支持的播放器都保存下面的字符串里面
 	#gmusicbrowser需要perl-net-dbus让其支持dbus通信才可以
-	players="rhythmbox audacious juk amarok amarokapp exaile banshee gmusicbrowser quodlibet qmmp mocp mpd muine mplayer audacious2"
+	players="rhythmbox audacious juk amarok amarokapp exaile banshee gmusicbrowser quodlibet qmmp mocp mpd muine mplayer audacious2 xmms2"
 	if PLAYER_RUNNING "$Player";then
 		echo -n "$Player"
 	else
@@ -520,6 +522,15 @@ GET_TITLE() {
 			echo "$t"
 		fi
 	;;
+	"xmms2")
+		if [ "$readname" = "filename" ];then
+			f="`xmms2 info 2>/dev/null | grep "\[server\] url =" \
+			| awk -F'[ =]+' '{print $3}'`"
+			DO_NAME "$f"
+		else
+			xmms2 current '${artist} - ${title}'
+		fi
+	;;
 	"gmusicbrowser")
 		tmp="`dbus-send --print-reply --dest=org.gmusicbrowser \
 		/org/gmusicbrowser org.gmusicbrowser.CurrentSong`"
@@ -655,6 +666,11 @@ GET_PLTM() {
 		tmptm=${tm//*:/}
 		sec=${tmptm/#0/}
 		[ "$tm" ] && echo $(($min*60+$sec))
+	;;
+	"xmms2")
+		tm="`xmms2 info | grep "\[server\] laststarted = " | \
+			awk -F'[ =]+' 'BEGIN{"date +%s"|getline;now=$0}{print now-$3}'`"
+		[ "$tm" ] && echo "$tm"
 	;;
 	"gmusicbrowser")
 		tm="`dbus-send --print-reply --dest=org.gmusicbrowser \

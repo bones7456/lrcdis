@@ -831,7 +831,7 @@ GET_STAT() {
 
 	Sleeptm=${Sleeptm:-0.6}
 
-	while :;do
+	(while :;do
 		((n0=${n0:-0}+1)); [ "$n0" -gt 5 ] && n0=1
 		((n1=${n1:-0}+1)); [ "$n1" -gt 6 ] && n1=1
 		sleep $Sleeptm
@@ -860,7 +860,29 @@ GET_STAT() {
 			fi
 		}
 		[ "$PlayerStat" = "Playing" ] && echo "Time $(eval "echo|awk '{print "${pltm0:-0}+$Sleeptm*$n0"}'")"
+	done)&
+
+	old_tty_settings=$(stty -g) #Save old settings
+	stty -icanon
+	stty -echo
+
+	while :; do
+		Keypress=$(head -c1)
+		offset=`cat /tmp/offset.pipe 2>/dev/null`
+		offset=${offset:-0}
+		if [ "x$Keypress" = "xw" ]; then  #输入 w 时候 offset + 100
+			((offset+=100))
+		elif [ "x$Keypress" = "xs"  ]; then  #输入 s 时候 offset -100
+			((offset-=100))
+		elif [ "x$Keypress" = "xq" ]; then  #输入 q 时候 退出程序
+			echo stop
+			break
+		fi
+		echo offset "$offset"
 	done
+
+	stty "$old_tty_settings" #Restore old settings
+
 }
 
 HANDLE_PARAM() {
@@ -963,11 +985,27 @@ GET_STAT |while read line0;do
 			DIS_WORDS E "未能下载歌词"
 		fi
 		#处理 offset
-		offset="`echo $lrc|awk -F"offset:" '{gsub("].*$","",$2);print $2/1000}'`";offset=${offset:-0}
+		offset="`echo $lrc|awk -F"offset:" '{gsub("].*$","",$2);print $2}'`";offset=${offset:-0}
+		echo $offset >/tmp/offset.pipe #把offset的初值传给 GET_STAT "子进程" 这种传递方法太恶心了，有没有其他法子呢？？
 	}
+	[ "$op" = "offset" ] && {
+		offset="${arg:-0}"
+		[ "$Dismode" = cli ] && tput cup  $((Row+1)) 1
+		echo -n -e "                            \r"
+		[ "$Dismode" = cli ] && tput cup  $((Row+1)) 1
+		if((offset>0)); then
+			echo -n -e "[歌词提前${offset}毫秒]\r"
+		elif((offset<0)); then
+			echo -n -e "[歌词延迟${offset#-*}毫秒]\r"
+		else
+			echo -n -e "[歌词正常]\r"
+		fi
+		echo $offset >/tmp/offset.pipe #把当前offset的值传给 GET_STAT "子进程"
+	}
+	[ "$op" = "stop" ] && break
 	[ "$op" = "Time" ] && [ "$lrc" ] && {
 		arg="${arg:-0}";
-		arg="`eval "echo|awk '{print "$arg+$offset"}'"`"
+		arg="`eval "echo|awk '{print "$arg+$offset/1000"}'"`"
 		arg=${arg//.*/};arg=${arg:-0}
 		arg="`printf '%.2d:%.2d' $(($arg/60)) $(($arg%60))`"
  		DISPLAY "$arg" "$lrc"

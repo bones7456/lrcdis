@@ -363,7 +363,7 @@ CHECK_AND_DOWN_LRC() {
 	}
 }
 
-GET_TITLE() {
+GET_RAW_TITLE() {
 	#获取当前播放的歌曲名字
 
 	#参数两个，$1 播放器类型,默认 rhythmbox、$2 获取歌曲名字方式，默认取id3; 返回正在播放的歌曲名
@@ -596,6 +596,23 @@ GET_TITLE() {
 	;;
 	esac
 }   
+
+TITLE_ENCODING() {
+	python -c "import sys
+try:
+  print sys.argv[1].decode('utf8').encode('iso-8859-1').decode('gbk').encode('utf8')
+except:
+  try:
+   print sys.argv[1].decode('utf8').encode('gbk').decode('utf8').encode('utf8')
+  except:
+   print sys.argv[1]
+" "$@" 
+}
+
+GET_TITLE() {
+	TITLE_ENCODING "`GET_RAW_TITLE $@`"
+}
+
 
 GET_PLTM() {
    #参数一个，$1，播放器类型；返回播放器播放歌曲的当前时间 (转换成秒)

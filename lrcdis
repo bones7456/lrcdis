@@ -5,7 +5,7 @@
 # Encoding: UTF-8
 # Thanks to: 搜狗歌词搜索
 
-Version=svn-090908
+Version=svn-100519
 #是否开启调试信息
 Debug=0
 Conf_file=~/.config/lrcdis.conf
@@ -627,7 +627,7 @@ GET_PLTM() {
 
 	case "${1:-rhythmbox}" in
 	"mpd")
-		tm="`mpc --format a | grep "/" | awk -F' ' '{print $3}' | awk -F'/' '{print $1}'`"
+		tm="`mpc --format a | grep "#" | awk -F' ' '{print $3}' | awk -F'/' '{print $1}'`"
 		DEBUGECHO "GET_PLTM: ${tm}<<"
 		[ -n "$tm" ] && {
 			min=${tm//:*/}

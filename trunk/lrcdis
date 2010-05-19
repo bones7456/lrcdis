@@ -168,7 +168,8 @@ PLAYER_RUNNING(){
 	#返回0表示进程存在,1表示不存在
 	{
 	if [ "$1" = "quodlibet" ]; then
-		pgrep -fx "python `which quodlibet`" -u "`PLAYER_USERS "$1"`" && return 0
+		#有可能是 python2.6 /usr/bin/quodlibet 这样的命令行
+		pgrep -f "python.* `which quodlibet`" -u "`PLAYER_USERS "$1"`" && return 0
 	elif [ "$1" = "banshee" ]; then
 		pgrep -x "banshee-1" -u "`PLAYER_USERS "$1"`" && return 0
 	elif [ "$1" = "xmms2" ]; then
@@ -598,16 +599,25 @@ GET_RAW_TITLE() {
 }   
 
 TITLE_ENCODING() {
-	python -c "import sys
-try:
-  print sys.argv[1].decode('utf8').encode('iso-8859-1').decode('gbk').encode('utf8')
-except:
-  try:
-   print sys.argv[1].decode('utf8').encode('gbk').decode('utf8').encode('utf8')
-  except:
-   print sys.argv[1]
-" "$@" 
+	DATA=`echo "$@" | iconv -f UTF-8 -t ISO-8859-1 2>/dev/null`
+	[ "$?" == "0" ] && {
+		DATA=`echo "$DATA" | iconv -f GBK -t UTF-8 2>/dev/null`
+		[ "$?" == "0" ] && {
+			echo "$DATA"
+			return 0
+		}
+	}
+	DATA=`echo "$@" | iconv -f UTF-8 -t GBK`
+	[ "$?" == "0" ] && {
+		DATA=`echo "$DATA" | iconv -f UTF-8 -t UTF-8 2>/dev/null`
+		[ "$?" == "0" ] && {
+			echo "$DATA"
+			return 0
+		}
+	}
+	echo "$@" 
 }
+
 
 GET_TITLE() {
 	TITLE_ENCODING "`GET_RAW_TITLE $@`"
